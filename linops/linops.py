@@ -2,6 +2,13 @@ import torch
 import operator
 
 
+def operator_matrix_product(A, M):
+    assert A.shape[1] == M.shape[0]
+    out = torch.empty((A.shape[0], M.shape[1]))
+    for i in range(M.shape[1]):
+        out[:, i] = A @ M[:, i]
+    return out
+
 
 def aslinearoperator(A):
     if isinstance(A, LinearOperator):
@@ -11,6 +18,7 @@ def aslinearoperator(A):
 
 class LinearOperator:
     _adjoint = None
+    _shape = None
 
     def __call__(self, x):
         return self @ x
@@ -58,6 +66,10 @@ class LinearOperator:
 
     def __pow__(self, n):
         return _PowOperator(self, n)
+
+    @property
+    def shape(self):
+        return self._shape
 
     @property
     def T(self):

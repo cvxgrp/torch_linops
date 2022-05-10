@@ -1,5 +1,8 @@
 import torch
 import operator
+from linops.cg import CG
+import linops.nystrom_precondition as nystrom 
+
 
 
 def operator_matrix_product(A, M):
@@ -19,6 +22,8 @@ def aslinearoperator(A):
 class LinearOperator:
     _adjoint = None
     _shape = None
+    _nystrom_sketch = None
+    _last_solve_of_x = None
 
     def __call__(self, x):
         return self @ x
@@ -36,13 +41,13 @@ class LinearOperator:
             return self.T @ a
 
     def __mul__(self, c):
-        return ScaleOperator(c) @ self
+        return _ScaleOperator(c, self.shape) @ self
     
     def __truediv__(self, c):
-        return ScaledownOperator(c) @ self
+        return _ScaledownOperator(c, self.shape) @ self
 
     def __rmul__(self, c):
-        return self @ ScaleOperator(c)
+        return self @ _ScaleOperator(c, self.shape)
 
     # __radd__ not needed because we only support sums of linear operators
     def __add__(self, b):
@@ -83,20 +88,34 @@ class LinearOperator:
             return self._adjoint
 
     def _matmul_impl(self, v):
-        v
         raise NotImplementedError()
 
-    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b):
-        self, lambda_, b
-        return (IdentityOperator() + lambda_ * self.T @ self).solve_A_x_eq_b(b)
+    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, x0=None, **kwargs):
+        precondition = None
+        if 'precondition' in kwargs:
+            assert kwargs['precondition'] == 'nystrom'
+            if self._nystrom_sketch is None:
+                self._nystrom_sketch = nystrom.construct_approximation(
+                    self,
+                    l_0=kwargs.get('l_0', 10),
+                    l_max=kwargs.get('l_max', 500),
+                    power_iter_count=kwargs.get('power_iter_count', 50),
+                    error_tol=kwargs.get('error_tol', 1.0),
+                    )
+            precondition = nystrom.NystromPreconditioner(
+                    self._nystrom_sketch, lambda_)
+        self._last_solve_of_x = CG(
+                self + lambda_ * IdentityOperator(self.shape[0]),
+                precondition)(b, self._last_solve_of_x)
+        return self._last_solve_of_x
 
     def solve_A_x_eq_b(self, b):
-        b
         raise NotImplementedError()
 
 class IdentityOperator(LinearOperator):
-    def __init__(self):
+    def __init__(self, n):
         self._adjoint = self
+        self._shape = (n, n)
 
     def _matmul_impl(self, v):
         return v
@@ -105,21 +124,25 @@ class DiagonalOperator(LinearOperator):
     def __init__(self, diag):
         self._adjoint = self
         self._diag = diag
+        m, = diag.shape
+        self._shape = (m, m)
 
     def _matmul_impl(self, v):
         return self._diag * v
 
-class ScaleOperator(LinearOperator):
-    def __init__(self, c):
+class _ScaleOperator(LinearOperator):
+    def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
+        self._shape = shape
     def _matmul_impl(self, v):
         return self._c * v
 
-class ScaledownOperator(LinearOperator):
-    def __init__(self, c):
+class _ScaledownOperator(LinearOperator):
+    def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
+        self._shape = shape
     def _matmul_impl(self, v):
         return v / self._c
 
@@ -130,6 +153,8 @@ class ScaledownOperator(LinearOperator):
 class MatrixOperator(LinearOperator):
     def __init__(self, matrix, adjoint=None):
         self._matrix = matrix
+        assert len(matrix.shape) == 2
+        self._shape = matrix.shape
         if adjoint is None:
             self._adjoint = MatrixOperator(self._matrix.T, self)
         else:
@@ -141,7 +166,7 @@ class MatrixOperator(LinearOperator):
     def _matmul_impl(self, v):
         return self._matrix @ v
 
-    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b):
+    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, **kwargs):
         if self.__ATA_matrix is None:
             A = self._matrix.clone()
             self.__ATA_matrix = A.T @ A
@@ -160,7 +185,9 @@ class _PowOperator(LinearOperator):
         self._linop = linop
         self._k = k
         assert k >= 0
+        assert linop.shape[0] == linop.shape[1]
         self._adjoint = _PowOperator(self._linop.T, self._k)
+        self._shape = linop.shape
 
     def _matmul_impl(self, v):
         k = self._k
@@ -170,10 +197,12 @@ class _PowOperator(LinearOperator):
 class _BinaryOperator(LinearOperator):
     """transpose must distribute over op"""
     def __init__(self, left, right, op):
+        assert left.shape == right.shape
         self._left = left
         self._right = right
         self._op = op
         self._adjoint = _BinaryOperator(self._left.T, self._right.T, self._op)
+        self._shape = left.shape
 
     def _matmul_impl(self, y):
         return self._op(self._left @ y, self._right @ y)
@@ -184,6 +213,7 @@ class _UrnaryOperator(LinearOperator):
         self._linop = linop
         self._op = op
         self._adjoint = _UrnaryOperator(self._linop.T, self._op) 
+        self._shape = linop.shape
 
     def _matmul_impl(self, y):
         return self._op(self._linop @ y)
@@ -196,15 +226,17 @@ class _JoinOperator(LinearOperator):
             self._adjoint = _JoinOperator(self._right.T, self._left.T, self)
         else:
             self._adjoint = adjoint
+        self._shape = (left.shape[0], right.shape[1])
 
     def _matmul_impl(self, y):
         return self._left @ (self._right @ y)
 
 class _AdjointSelectionOperator(LinearOperator):
-    def __init__(self, input_shape, idxs, adjoint):
+    def __init__(self, input_shape, idxs, adjoint, shape):
         self._adjoint = adjoint
         self._input_shape = input_shape
         self._idxs = idxs
+        self._shape = shape
 
     def _matmul_impl(self, y):
         z = torch.zeros(self._input_shape, dtype=y.dtype, device=y.device)
@@ -213,7 +245,12 @@ class _AdjointSelectionOperator(LinearOperator):
 
 class SelectionOperator(LinearOperator):
     def __init__(self, input_shape, idxs):
-        self._adjoint = _AdjointSelectionOperator(input_shape, idxs, self)
+        in_shape = 1
+        for i in input_shape:
+            in_shape *= i
+        self._shape = (len(idxs[0]), in_shape)
+        self._adjoint = _AdjointSelectionOperator(input_shape,
+                idxs, self, (self._shape[1], self._shape[0]))
         self._input_shape = input_shape
         self._idxs = idxs
 

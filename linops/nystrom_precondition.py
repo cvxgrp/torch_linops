@@ -1,15 +1,16 @@
+from __future__ import annotations
 import torch
 from dataclasses import dataclass
 import linops as lo
 
 @dataclass
-class NystromApproximation:
+class _NystromApproximation:
     U: torch.Tensor
     Lambda_hat: torch.Tensor
 
 @dataclass
 class NystromPreconditioner:
-    A_hat: NystromApproximation
+    A_hat: _NystromApproximation
     mu: torch.Tensor
 
     def __call__(self, v):
@@ -58,7 +59,7 @@ def construct_approximation(
             l_0 = l_0 - m
             m = l_max - l_0
             break_early = True
-    return NystromApproximation(U, Lambda_hat)
+    return _NystromApproximation(U, Lambda_hat)
 
 
 def randomized_power_err_est(A, U, Lambda_hat, q):

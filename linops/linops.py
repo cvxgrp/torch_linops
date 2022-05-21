@@ -21,7 +21,7 @@ def aslinearoperator(A):
 
 class LinearOperator:
     _adjoint = None
-    _shape = None
+    _shape: tuple[int, int] = None
     _nystrom_sketch = None
     _last_solve_of_x = None
 
@@ -71,9 +71,19 @@ class LinearOperator:
 
     def __pow__(self, n):
         return _PowOperator(self, n)
+    
+    def __getitem__(self, key):
+        out = torch.empty(self.shape[0])
+        in_ = torch.empty(self.shape[1])
+        if not isinstance(key, tuple):
+            # Only recieved one index, so we're only applying to the output
+            shape = (out[key].shape[0], self.shape[1])
+            return SelectionOperatorV2(shape, key) @ self
+        shape = (out[key[0]].shape[0], in_[key[1]][0])
+        return SelectionOperatorV2(shape, key[0]) @ self @ SelectionOperatorV2(shape, key[1]).T
 
     @property
-    def shape(self):
+    def shape(self) -> tuple[int, int]:
         return self._shape
 
     @property
@@ -111,6 +121,29 @@ class LinearOperator:
 
     def solve_A_x_eq_b(self, b):
         raise NotImplementedError()
+
+class FusedOperator(LinearOperator):
+    def __init__(self, shape: tuple[int, int],
+                       in_slices: list[slice],
+                       out_slices: list[slice],
+                       ops: list[LinearOperator],
+                       adjoint=None):
+        self._shape = shape
+        self._in_slices = in_slices
+        self._out_slices = out_slices
+        self._ops = ops
+        if adjoint is None:
+            self._adjoint = FusedOperator((shape[1], shape[0]), out_slices,
+                    in_slices, ops, self)
+        else:
+            self._adjoint = adjoint
+    
+    def _matmul_impl(self, v):
+        out = torch.empty(self._shape[0], device=v.device, dtype=v.dtype)
+        for in_s, out_s, op in zip(self._in_slices, self._out_slices, self._ops,
+                strict=True):
+            out[out_s] += op @ v[in_s]
+        return out
 
 class IdentityOperator(LinearOperator):
     def __init__(self, n):
@@ -196,12 +229,14 @@ class _PowOperator(LinearOperator):
 
 class _BinaryOperator(LinearOperator):
     """transpose must distribute over op"""
-    def __init__(self, left, right, op):
+    def __init__(self, left, right, op, adjoint=None):
         assert left.shape == right.shape
         self._left = left
         self._right = right
         self._op = op
-        self._adjoint = _BinaryOperator(self._left.T, self._right.T, self._op)
+        if adjoint is None:
+            self._adjoint = _BinaryOperator(
+                    self._left.T, self._right.T, self._op, self)
         self._shape = left.shape
 
     def _matmul_impl(self, y):
@@ -243,7 +278,7 @@ class _AdjointSelectionOperator(LinearOperator):
         z[self._idxs] = y
         return z.reshape(-1)
 
-class SelectionOperator(LinearOperator):
+class SelectionOperatorV1(LinearOperator):
     def __init__(self, input_shape, idxs):
         in_shape = 1
         for i in input_shape:
@@ -265,3 +300,29 @@ class SelectionOperator(LinearOperator):
         LHS[self._idxs] += lambda_
         LHS = LHS.reshape(-1)
         return b / LHS
+
+class SelectionOperatorV2(LinearOperator):
+    def __init__(self, shape, idxs):
+        self._shape = shape
+        self._adjoint = _AdjointSelectionOperatorV2(idxs,
+                (self._shape[1], self._shape[0]), self)
+        self._idxs = idxs
+
+    def _matmul_impl(self, X):
+        return X[self._idxs]
+
+    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b):
+        LHS = torch.ones_like(b)
+        LHS[self._idxs] += lambda_
+        return b / LHS
+
+class _AdjointSelectionOperatorV2(LinearOperator):
+    def __init__(self,  idxs, shape, adjoint):
+        self._adjoint = adjoint
+        self._idxs = idxs
+        self._shape = shape
+
+    def _matmul_impl(self, y):
+        z = torch.zeros(self.shape[0], dtype=y.dtype, device=y.device)
+        z[self._idxs] = y
+        return z.reshape(-1)

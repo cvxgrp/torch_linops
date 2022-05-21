@@ -5,5 +5,5 @@ from linops.linops import (
         IdentityOperator,
         DiagonalOperator,
         MatrixOperator,
-        SelectionOperator,
+        SelectionOperatorV2,
 )

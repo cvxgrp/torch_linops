@@ -44,7 +44,7 @@ def cg_batch_Kis1(A_mm, B, M_mm=None, X0=None, rtol=1e-3, atol=0.,
         maxiter: (optional) Maximum number of iterations to perform. (default=5*n)
         verbose: (optional) Whether or not to print status messages. (default=False)
     """
-    n = B.shape
+    n, = B.shape
 
     if M_mm is None:
         M_mm = lambda x: x
@@ -103,8 +103,8 @@ def cg_batch_Kis1(A_mm, B, M_mm=None, X0=None, rtol=1e-3, atol=0.,
         denominator = (P_k * A_mm(P_k)).sum()
         denominator[denominator == 0] = 1e-8
         alpha = (R_k1 * Z_k1).sum() / denominator
-        X_k = X_k1 + alpha.unsqueeze() * P_k
-        R_k = R_k1 - alpha.unsqueeze() * A_mm(P_k)
+        X_k = X_k1 + alpha * P_k
+        R_k = R_k1 - alpha * A_mm(P_k)
         end_iter = time.perf_counter()
 
         residual_norm = torch.norm(A_mm(X_k) - B)
@@ -133,6 +133,7 @@ def cg_batch_Kis1(A_mm, B, M_mm=None, X0=None, rtol=1e-3, atol=0.,
         "niter": k,
         "optimal": optimal
     }
+    print(info)
 
     return X_k, info
 
@@ -209,13 +210,13 @@ def cg_batch(A_bmm, B, M_bmm=None, X0=None, rtol=1e-3, atol=0., maxiter=None, ve
             denominator = (R_k2 * Z_k2).sum(1)
             denominator[denominator == 0] = 1e-8
             beta = (R_k1 * Z_k1).sum(1) / denominator
-            P_k = Z_k1 + beta.unsqueeze(1) * P_k1
+            P_k = Z_k1 + beta * P_k1
 
         denominator = (P_k * A_bmm(P_k)).sum(1)
         denominator[denominator == 0] = 1e-8
         alpha = (R_k1 * Z_k1).sum(1) / denominator
-        X_k = X_k1 + alpha.unsqueeze(1) * P_k
-        R_k = R_k1 - alpha.unsqueeze(1) * A_bmm(P_k)
+        X_k = X_k1 + alpha * P_k
+        R_k = R_k1 - alpha * A_bmm(P_k)
         end_iter = time.perf_counter()
 
         residual_norm = torch.norm(A_bmm(X_k) - B, dim=1)
@@ -247,24 +248,19 @@ def cg_batch(A_bmm, B, M_bmm=None, X0=None, rtol=1e-3, atol=0., maxiter=None, ve
 
     return X_k, info
 
-
-class CG(torch.autograd.Function):
-
-    def __init__(self, A_mm, M_mm=None, rtol=1e-3, atol=0., maxiter=None,
+def CG(A_mm, M_mm=None, rtol=1e-3, atol=0., maxiter=None,
             verbose=False):
-        self.A_mm = A_mm
-        self.M_mm = M_mm
-        self.rtol = rtol
-        self.atol = atol
-        self.maxiter = maxiter
-        self.verbose = verbose
+    class CG(torch.autograd.Function):
+        
+        @staticmethod
+        def forward(_ctx, B, X0=None):
+            X, _ = cg_batch_Kis1(A_mm, B, M_mm=M_mm, X0=X0, rtol=rtol,
+                        atol=atol, maxiter=maxiter, verbose=verbose)
+            return X
 
-    def forward(self, B, X0=None):
-        X, _ = cg_batch_Kis1(self.A_mm, B, M_mm=self.M_mm, X0=X0, rtol=self.rtol,
-                     atol=self.atol, maxiter=self.maxiter, verbose=self.verbose)
-        return X
-
-    def backward(self, dX):
-        dB, _ = cg_batch_Kis1(self.A_mm, dX, M_mm=self.M_mm, rtol=self.rtol,
-                      atol=self.atol, maxiter=self.maxiter, verbose=self.verbose)
-        return dB
+        @staticmethod
+        def backward(_ctx, dX):
+            dB, _ = cg_batch_Kis1(A_mm, dX, M_mm=M_mm, rtol=rtol,
+                        atol=atol, maxiter=maxiter, verbose=verbose)
+            return dB
+    return CG.apply

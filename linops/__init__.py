@@ -7,3 +7,7 @@ from linops.linops import (
         MatrixOperator,
         SelectionOperatorV2,
 )
+from linops.blocks import (
+    vstack,
+    hstack
+)

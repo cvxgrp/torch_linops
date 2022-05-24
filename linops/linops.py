@@ -102,7 +102,7 @@ class LinearOperator:
 
     def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, x0=None, **kwargs):
         precondition = None
-        if 'precondition' in kwargs:
+        if 'precondition' in kwargs and kwargs['precondition'] is not None:
             assert kwargs['precondition'] == 'nystrom'
             if self._nystrom_sketch is None:
                 self._nystrom_sketch = nystrom.construct_approximation(
@@ -115,35 +115,12 @@ class LinearOperator:
             precondition = nystrom.NystromPreconditioner(
                     self._nystrom_sketch, lambda_)
         self._last_solve_of_x = CG(
-                self + lambda_ * IdentityOperator(self.shape[0]),
-                precondition)(b, self._last_solve_of_x)
+                IdentityOperator(self.shape[1]) + lambda_ * (self.T @ self),
+                precondition)(b)
         return self._last_solve_of_x
 
     def solve_A_x_eq_b(self, b):
         raise NotImplementedError()
-
-class FusedOperator(LinearOperator):
-    def __init__(self, shape: tuple[int, int],
-                       in_slices: list[slice],
-                       out_slices: list[slice],
-                       ops: list[LinearOperator],
-                       adjoint=None):
-        self._shape = shape
-        self._in_slices = in_slices
-        self._out_slices = out_slices
-        self._ops = ops
-        if adjoint is None:
-            self._adjoint = FusedOperator((shape[1], shape[0]), out_slices,
-                    in_slices, ops, self)
-        else:
-            self._adjoint = adjoint
-    
-    def _matmul_impl(self, v):
-        out = torch.empty(self._shape[0], device=v.device, dtype=v.dtype)
-        for in_s, out_s, op in zip(self._in_slices, self._out_slices, self._ops,
-                strict=True):
-            out[out_s] += op @ v[in_s]
-        return out
 
 class IdentityOperator(LinearOperator):
     def __init__(self, n):

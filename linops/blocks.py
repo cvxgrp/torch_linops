@@ -21,7 +21,8 @@ class FusedOperator(LinearOperator):
     def _matmul_impl(self, v):
         out = torch.zeros(self._shape[0], device=v.device, dtype=v.dtype)
         for in_s, out_s, op in zip(self._in_slices, self._out_slices, self._ops,
-                strict=True):
+                # strict=True, Readd this when upgrading MPV to 3.10 
+                ):
             out[out_s] += op @ v[in_s]
         return out
 

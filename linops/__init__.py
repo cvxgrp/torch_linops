@@ -6,6 +6,7 @@ from linops.linops import (
         DiagonalOperator,
         MatrixOperator,
         SelectionOperatorV2,
+        KKTOperator,
 )
 from linops.blocks import (
     vstack,

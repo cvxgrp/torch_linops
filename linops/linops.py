@@ -1,6 +1,7 @@
 import torch
 import operator
 from linops.cg import CG
+from linops.minres import minres
 import linops.nystrom_precondition as nystrom 
 
 
@@ -119,8 +120,11 @@ class LinearOperator:
                 precondition)(b)
         return self._last_solve_of_x
 
-    def solve_A_x_eq_b(self, b):
-        raise NotImplementedError()
+    def solve_A_x_eq_b(self, b, x0=None):
+        if self is self._adjoint:
+            return minres(self, b, x0=x0)
+        else:
+            raise NotImplementedError()
 
 class IdentityOperator(LinearOperator):
     def __init__(self, n):
@@ -129,6 +133,9 @@ class IdentityOperator(LinearOperator):
 
     def _matmul_impl(self, v):
         return v
+
+    def solve_A_x_eq_b(self, b, x0=None):
+        return b
 
 class DiagonalOperator(LinearOperator):
     def __init__(self, diag):
@@ -140,11 +147,16 @@ class DiagonalOperator(LinearOperator):
     def _matmul_impl(self, v):
         return self._diag * v
 
+    def solve_A_x_eq_b(self, b, x0=None):
+        return b / self._diag
+
+
 class _ScaleOperator(LinearOperator):
     def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
         self._shape = shape
+
     def _matmul_impl(self, v):
         return self._c * v
 
@@ -153,12 +165,9 @@ class _ScaledownOperator(LinearOperator):
         self._c = c
         self._adjoint = self
         self._shape = shape
+
     def _matmul_impl(self, v):
         return v / self._c
-
-    @property
-    def T(self):
-        return self
 
 class MatrixOperator(LinearOperator):
     def __init__(self, matrix, adjoint=None):
@@ -187,7 +196,7 @@ class MatrixOperator(LinearOperator):
             self.__IplATA_matrix = self.__I + lATA
         return torch.linalg.solve(self.__IplATA_matrix, b)
 
-    def solve_A_x_eq_b(self, b):
+    def solve_A_x_eq_b(self, b, x0=None):
         return torch.linalg.solve(self._matrix, b)
 
 class _PowOperator(LinearOperator):
@@ -303,3 +312,23 @@ class _AdjointSelectionOperatorV2(LinearOperator):
         z = torch.zeros(self.shape[0], dtype=y.dtype, device=y.device)
         z[self._idxs] = y
         return z.reshape(-1)
+
+class KKTOperator(LinearOperator):
+    def __init__(self, H: LinearOperator, A: LinearOperator):
+        k, ell = H.shape
+        assert k == ell
+        m, n = A.shape
+        assert n == k
+        self._shape = (m + n, m + n)
+        self._adjoint = self
+        self._A = A
+        self._H = H
+        self._m = m
+        self._n = n
+
+    def _matmul_impl(self, y):
+        n = self._n
+        return torch.hstack([
+            self._H @ y[:n] + self._A.T @ y[n:],
+            self._A @ y[:n]
+        ])

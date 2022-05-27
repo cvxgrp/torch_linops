@@ -5,7 +5,7 @@ def equilibrate(
         alpha_squared=1,
         beta_squared=1,
         gamma=1.0,
-        M=10,
+        M=1000.,
         iterations=20,
 ):
     """
@@ -49,9 +49,9 @@ def equilibrate(
 def symmetric_equilibrate(
     A, 
     alpha = 1,
-    gamma = 2.0,
-    M = 20,
-    iterations=20,
+    gamma = 0.4,
+    M = 15,
+    iterations=200,
 ):
     n, m = A.shape
     assert n == m

@@ -111,7 +111,7 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         epsilon = sn * beta
         dbar = -cs * beta
         root = L2norm2entry(gbar, dbar)
-        Anorm = phibar * root
+        #Arnorm = phibar * root
 
         gamma = L2norm2entry(gbar, beta)
         gamma = torch.maximum(gamma, eps)

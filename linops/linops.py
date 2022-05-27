@@ -25,6 +25,7 @@ class LinearOperator:
     _shape: tuple[int, int] = None
     _nystrom_sketch = None
     _last_solve_of_x = None
+    device = None
 
     def __call__(self, x):
         return self @ x
@@ -94,9 +95,10 @@ class LinearOperator:
             D_x(v @ A @ x) = A^T v
         """
         if self._adjoint is None:
-            raise NotImplementedError("Implement automatic adjoints")
-        else:
-            return self._adjoint
+            x = torch.ones(self.shape[1], device=self.device, requires_grad=True)
+            g = self @ x
+            self._adjoint = _VectorJacobianOperator(g, x, self)
+        return self._adjoint
 
     def _matmul_impl(self, v):
         raise NotImplementedError()
@@ -125,6 +127,20 @@ class LinearOperator:
             return minres(self, b, x0=x0)
         else:
             raise NotImplementedError()
+
+class _VectorJacobianOperator(LinearOperator):
+    def __init__(self, g, x, adjoint):
+        self._shape = (x.shape[0], g.shape[0])
+        self._adjoint = adjoint
+        self._g = g
+        self._x = x
+
+    def _matmul_impl(self, v):
+        self._x.grad = None
+        self._g.backward(gradient=v, retain_graph=True)
+        out = self._x.grad
+        self._x.grad = None
+        return out
 
 class IdentityOperator(LinearOperator):
     def __init__(self, n):

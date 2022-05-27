@@ -52,16 +52,17 @@ def symmetric_equilibrate(
     gamma = 0.4,
     M = 15,
     iterations=200,
+    device=None
 ):
     n, m = A.shape
     assert n == m
-    u_k = torch.zeros(n)
-    u_bar = torch.zeros(n)
+    u_k = torch.zeros(n, device=device)
+    u_bar = torch.zeros(n, device=device)
     alpha_squared = alpha**2
 
     for t in range(1, iterations):
         D = torch.exp(u_k)
-        s = 2 * torch.randint(2, (n,)) - 1
+        s = 2 * torch.randint(2, (n,), device=device) - 1
         u = u_k - 2 * (
                         torch.abs(D * (A @ (D * s)))**2 - alpha_squared + gamma * u_k
                     ) / (gamma * (t + 1))

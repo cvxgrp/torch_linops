@@ -59,10 +59,12 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
     beta1 = r1 @ y
     assert beta1 >= 0
     if beta1 == 0:
-        return ...
+        return x
     bnorm = torch.linalg.vector_norm(b)
     if bnorm == 0:
-        return ...
+        return b
+
+    beta1 = torch.sqrt(beta1)
 
     oldb = 0
     beta = beta1
@@ -100,7 +102,8 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         tnorm2 += alpha**2 + oldb**2 + beta**2
         if iters == 1:
             if beta / beta1 <= 10 * eps:
-                assert False, "I think this occurs when A = c * I"
+                #assert False, "I think this occurs when A = c * I"
+                pass
 
         oldeps = epsilon
         delta = cs * dbar + sn * alpha
@@ -134,7 +137,7 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         ynorm = torch.linalg.norm(x)
         epsa = Anorm * eps
         epsx = Anorm * ynorm * eps
-        epsr = Anorm * ynorm * tol
+        #epsr = Anorm * ynorm * tol
         diag = gbar
         if diag == 0:
             diag = epsa
@@ -156,7 +159,7 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
             break
         if t1 <= 1:
             break
-        
+
         if Acond >= 0.1 / eps:
             assert False, "System is ill-conditioned."
         if epsx >= beta1:

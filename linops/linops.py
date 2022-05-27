@@ -230,10 +230,13 @@ class _BinaryOperator(LinearOperator):
     
 class _UrnaryOperator(LinearOperator):
     """ transpose must pass through op """
-    def __init__(self, linop, op):
+    def __init__(self, linop, op, adjoint=None):
         self._linop = linop
         self._op = op
-        self._adjoint = _UrnaryOperator(self._linop.T, self._op) 
+        if adjoint is None:
+            self._adjoint = _UrnaryOperator(self._linop.T, self._op, self)
+        else:
+            self._adjoint = adjoint
         self._shape = linop.shape
 
     def _matmul_impl(self, y):
@@ -329,6 +332,6 @@ class KKTOperator(LinearOperator):
     def _matmul_impl(self, y):
         n = self._n
         return torch.hstack([
-            self._H @ y[:n] + self._A.T @ y[n:],
-            self._A @ y[:n]
+            self._H @ y[:n] - self._A.T @ y[n:],
+            -self._A @ y[:n]
         ])

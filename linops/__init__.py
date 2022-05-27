@@ -12,3 +12,4 @@ from linops.blocks import (
     vstack,
     hstack
 )
+import linops.equilibration

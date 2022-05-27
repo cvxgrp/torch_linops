@@ -3,7 +3,7 @@ import torch
 import linops as lo
 from linops.cg import CG
 
-A = lo
+A = lo.IdentityOperator(3)
 
 assert (torch.linalg.matrix_rank(lo.operator_matrix_product(A, torch.eye(3)))) == 3
 

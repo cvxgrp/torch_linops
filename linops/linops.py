@@ -202,21 +202,25 @@ class MatrixOperator(LinearOperator):
     def _matmul_impl(self, v):
         return self._matrix @ v
 
-    def _old_solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, **kwargs):
+    def _direct_solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, **kwargs):
         if self.__ATA_matrix is None:
             A = self._matrix.clone()
             self.__ATA_matrix = A.T @ A
-            self.__I = torch.eye(A.shape[0])
 
         if self.__lambda_cache != lambda_:
             lATA = lambda_ * (self.__ATA_matrix)
-            self.__IplATA_matrix = self.__I + lATA
+            torch.diagonal(lATA)[:] += 1
+            self.__IplATA_matrix = lATA
         return torch.linalg.solve(self.__IplATA_matrix, b)
 
     def solve_A_x_eq_b(self, b, x0=None):
         return torch.linalg.solve(self._matrix, b)
 
     def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, x0=None, **kwargs):
+        return self._direct_solve_I_p_lambda_AT_A_x_eq_b(lambda_, b,
+                                                         x0=x0, **kwargs)
+
+    def _cg_solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, x0=None, **kwargs):
         if self.__diagonal_ATA is None:
             self.__diagonal_ATA = torch.linalg.vector_norm(self._matrix, axis=0)
         M = DiagonalOperator(lambda_ * self.__diagonal_ATA + 1)

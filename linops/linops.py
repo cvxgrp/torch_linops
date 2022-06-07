@@ -197,11 +197,12 @@ class MatrixOperator(LinearOperator):
         self.__ATA_matrix = None
         self.__lambda_cache = None
         self.__IplATA_matrix = None
+        self.__diagonal_ATA = None
 
     def _matmul_impl(self, v):
         return self._matrix @ v
 
-    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, **kwargs):
+    def _old_solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, **kwargs):
         if self.__ATA_matrix is None:
             A = self._matrix.clone()
             self.__ATA_matrix = A.T @ A
@@ -214,6 +215,15 @@ class MatrixOperator(LinearOperator):
 
     def solve_A_x_eq_b(self, b, x0=None):
         return torch.linalg.solve(self._matrix, b)
+
+    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b, x0=None, **kwargs):
+        if self.__diagonal_ATA is None:
+            self.__diagonal_ATA = torch.linalg.vector_norm(self._matrix, axis=0)
+        M = DiagonalOperator(lambda_ * self.__diagonal_ATA + 1)
+        self._last_solve_of_x = CG(
+                IdentityOperator(self.shape[1]) + lambda_ * (self.T @ self),
+                M)(b)
+        return self._last_solve_of_x
 
 class _PowOperator(LinearOperator):
     def __init__(self, linop, k:int):

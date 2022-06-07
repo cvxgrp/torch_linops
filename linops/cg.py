@@ -139,19 +139,22 @@ def cg_batch_Kis1(A_mm, B, M_mm=None, X0=None, rtol=1e-3, atol=0.,
 
     return X_k
 
-def CG(A_mm, M_mm=None, rtol=1e-3, atol=0., maxiter=None,
+def CG(A_mm, M_mm=None, rtol=1e-3, atol=0., maxiter=None, X0=None,
             verbose=False):
+    bX0 = None
     class CG(torch.autograd.Function):
         
         @staticmethod
-        def forward(_ctx, B, X0=None):
+        def forward(_ctx, B):
             X = cg_batch_Kis1(A_mm, B, M_mm=M_mm, X0=X0, rtol=rtol,
                         atol=atol, maxiter=maxiter, verbose=verbose)
             return X
 
         @staticmethod
         def backward(_ctx, dX):
-            dB = cg_batch_Kis1(A_mm, dX, M_mm=M_mm, rtol=rtol,
+            nonlocal bX0
+            dB = cg_batch_Kis1(A_mm, dX, M_mm=M_mm, X0=bX0, rtol=rtol,
                         atol=atol, maxiter=maxiter, verbose=verbose)
+            bX0 = dB
             return dB
     return CG.apply

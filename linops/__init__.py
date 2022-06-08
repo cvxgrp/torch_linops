@@ -5,8 +5,9 @@ from linops.linops import (
         IdentityOperator,
         DiagonalOperator,
         MatrixOperator,
-        SelectionOperatorV2,
+        SelectionOperator,
         KKTOperator,
+        VectorJacobianOperator,
 )
 from linops.blocks import (
     vstack,

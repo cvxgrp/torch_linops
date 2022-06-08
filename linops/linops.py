@@ -97,7 +97,7 @@ class LinearOperator:
         if self._adjoint is None:
             x = torch.ones(self.shape[1], device=self.device, requires_grad=True)
             g = self @ x
-            self._adjoint = _VectorJacobianOperator(g, x, self)
+            self._adjoint = VectorJacobianOperator(g, x, self)
         return self._adjoint
 
     def _matmul_impl(self, v):
@@ -128,8 +128,8 @@ class LinearOperator:
         else:
             raise NotImplementedError()
 
-class _VectorJacobianOperator(LinearOperator):
-    def __init__(self, g, x, adjoint):
+class VectorJacobianOperator(LinearOperator):
+    def __init__(self, g, x, adjoint=None):
         self._shape = (x.shape[0], g.shape[0])
         self._adjoint = adjoint
         self._g = g
@@ -285,45 +285,10 @@ class _JoinOperator(LinearOperator):
     def _matmul_impl(self, y):
         return self._left @ (self._right @ y)
 
-class _AdjointSelectionOperator(LinearOperator):
-    def __init__(self, input_shape, idxs, adjoint, shape):
-        self._adjoint = adjoint
-        self._input_shape = input_shape
-        self._idxs = idxs
-        self._shape = shape
-
-    def _matmul_impl(self, y):
-        z = torch.zeros(self._input_shape, dtype=y.dtype, device=y.device)
-        z[self._idxs] = y
-        return z.reshape(-1)
-
-class SelectionOperatorV1(LinearOperator):
-    def __init__(self, input_shape, idxs):
-        in_shape = 1
-        for i in input_shape:
-            in_shape *= i
-        self._shape = (len(idxs[0]), in_shape)
-        self._adjoint = _AdjointSelectionOperator(input_shape,
-                idxs, self, (self._shape[1], self._shape[0]))
-        self._input_shape = input_shape
-        self._idxs = idxs
-
-    def _matmul_impl(self, X):
-        if X.shape != self._input_shape:
-            X = X.reshape(self._input_shape)
-        return X[self._idxs]
-
-    def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b):
-        LHS = torch.ones_like(b)
-        LHS = LHS.reshape(self._input_shape)
-        LHS[self._idxs] += lambda_
-        LHS = LHS.reshape(-1)
-        return b / LHS
-
-class SelectionOperatorV2(LinearOperator):
+class SelectionOperator(LinearOperator):
     def __init__(self, shape, idxs):
         self._shape = shape
-        self._adjoint = _AdjointSelectionOperatorV2(idxs,
+        self._adjoint = _AdjointSelectionOperator(idxs,
                 (self._shape[1], self._shape[0]), self)
         self._idxs = idxs
 
@@ -335,7 +300,7 @@ class SelectionOperatorV2(LinearOperator):
         LHS[self._idxs] += lambda_
         return b / LHS
 
-class _AdjointSelectionOperatorV2(LinearOperator):
+class _AdjointSelectionOperator(LinearOperator):
     def __init__(self,  idxs, shape, adjoint):
         self._adjoint = adjoint
         self._idxs = idxs

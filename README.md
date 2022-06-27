@@ -17,11 +17,13 @@ Linear operators can be constructed in the following way:
  * Creating a sub-class of `LinearOperator` 
  * Calling one of the following constructors:
     * `IdentityOperator(n)`
-    * `DiagonalOperator(diag)`
-    * `MatrixOperator(M)`
+    * `DiagonalOperator(diag)`: where `diag` is a 1D torch tensor.
+    * `MatrixOperator(M)`: where `M` is a 2D torch tensor.
     * `SelectionOperator(shape, idxs)`
-    * `KKTOperator(H, A)`
-    * `VectorJacobianOperator(f, x)`
+    * `KKTOperator(H, A)`: where `H` is a square `LinearOperator` and `A` is a `LinearOperator`
+    * `VectorJacobianOperator(f, x)`: where `f` is the output of the function being differentiated
+        which has a torch autograd value and `x` is the vector on which `ensures_grad` was called.
+    * `ZeroOperator(shape)`
  * Combining operators via:
     * `A + B`, `A - B`, `A @ B` for `A`, `B` linear operators
     * `hstack`, `vstack`

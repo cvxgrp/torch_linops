@@ -8,6 +8,7 @@ from linops.linops import (
         SelectionOperator,
         KKTOperator,
         VectorJacobianOperator,
+        ZeroOperator,
 )
 from linops.blocks import (
     vstack,

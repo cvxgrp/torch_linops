@@ -128,6 +128,16 @@ class LinearOperator:
         else:
             raise NotImplementedError()
 
+class ZeroOperator(LinearOperator):
+    def __init__(self, shape, adjoint=None):
+        self._shape = shape
+        self._adjoint = ZeroOperator((shape[1], shape[0]), self) \
+                if adjoint is None else adjoint
+
+    def _matmul_impl(self, v):
+        return torch.zeros(self.shape[0], device=v.device)
+
+
 class VectorJacobianOperator(LinearOperator):
     def __init__(self, g, x, adjoint=None):
         self._shape = (x.shape[0], g.shape[0])

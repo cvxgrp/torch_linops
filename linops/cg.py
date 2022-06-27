@@ -110,8 +110,8 @@ def cg_batch_Kis1(A_mm, B, M_mm=None, X0=None, rtol=1e-3, atol=0.,
         residual_norm = torch.norm(A_mm(X_k) - B)
 
         if verbose:
-            print("%03d | %8.4e %4.2f" %
-                  (k, torch.max(residual_norm-epsilon),
+            print("%03d | %8.4e %8.4e %4.2f" %
+                  (k, residual_norm, epsilon,
                     1. / (end_iter - start_iter)))
 
         if (residual_norm <= epsilon).all():

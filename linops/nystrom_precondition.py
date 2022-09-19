@@ -25,12 +25,13 @@ def construct_approximation(
         l_0: int,
         l_max: int,
         power_iter_count: int,
-        error_tol):
+        error_tol, dtype=None):
     n = A.shape[0]
     assert A.shape[0] == A.shape[1]
+    device = A.device
 
-    Y = torch.Tensor((n, 0))
-    Omega = torch.Tensor((n, 0))
+    Y = torch.empty((n, 0), dtype=dtype, device=device)
+    Omega = torch.empty((n, 0), dtype=dtype, device=device)
     E = torch.inf
     m = l_0
     break_early = False
@@ -39,7 +40,7 @@ def construct_approximation(
     nu = math.sqrt(n) * torch.finfo().eps
 
     while E > error_tol:
-        Omega_0 = torch.randn((n, m))
+        Omega_0 = torch.randn((n, m), dtype=dtype, device=device)
         Omega_0, _ = torch.linalg.qr(Omega_0)
         Y_0 = lo.operator_matrix_product(A, Omega_0)
         Omega = torch.hstack([Omega, Omega_0])
@@ -54,7 +55,7 @@ def construct_approximation(
         if break_early:
             break
 
-        E = randomized_power_err_est(A, U, Lambda_hat, power_iter_count)
+        E = randomized_power_err_est(A, U, Lambda_hat, power_iter_count, dtype, device)
         m, l_0 = l_0, 2 * l_0
         if l_0 > l_max:
             l_0 = l_0 - m
@@ -63,8 +64,8 @@ def construct_approximation(
     return _NystromApproximation(U, Lambda_hat)
 
 
-def randomized_power_err_est(A, U, Lambda_hat, q):
-    g = torch.randn(A.shape[0])
+def randomized_power_err_est(A, U, Lambda_hat, q, dtype, device):
+    g = torch.randn(A.shape[0], dtype=dtype, device=device)
     v_0 = g / torch.linalg.norm(g)
     E_hat = torch.inf
     for _ in range(q):

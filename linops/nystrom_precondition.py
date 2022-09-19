@@ -1,5 +1,6 @@
 from __future__ import annotations
 import torch
+import math
 from dataclasses import dataclass
 import linops as lo
 
@@ -35,7 +36,7 @@ def construct_approximation(
     break_early = False
     U = torch.Tensor([])
     Lambda_hat = torch.Tensor([])
-    nu = torch.sqrt(n) * torch.finfo().eps
+    nu = math.sqrt(n) * torch.finfo().eps
 
     while E > error_tol:
         Omega_0 = torch.randn((n, m))
@@ -46,7 +47,7 @@ def construct_approximation(
         # Check the meaning of everything on line 8 of E.2
         Y_nu = Y + nu * Omega
         C = torch.linalg.cholesky(Omega.T @ Y_nu)
-        B = torch.linalg.solve(C, Y_nu)  # Verify this is efficient
+        B = torch.linalg.solve_triangular(C, Y_nu, upper=False)
         U, Sigma, _ = torch.linalg.svd(B)  # Figure out what the second argument to SVD is
         Lambda_hat = torch.relu(Sigma * Sigma - nu)
 

@@ -80,9 +80,9 @@ class LinearOperator:
         if not isinstance(key, tuple):
             # Only recieved one index, so we're only applying to the output
             shape = (out[key].shape[0], self.shape[1])
-            return SelectionOperatorV2(shape, key) @ self
+            return SelectionOperator(shape, key) @ self
         shape = (out[key[0]].shape[0], in_[key[1]][0])
-        return SelectionOperatorV2(shape, key[0]) @ self @ SelectionOperatorV2(shape, key[1]).T
+        return SelectionOperator(shape, key[0]) @ self @ SelectionOperator(shape, key[1]).T
 
     @property
     def shape(self) -> tuple[int, int]:

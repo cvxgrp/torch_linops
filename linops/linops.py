@@ -43,7 +43,7 @@ class LinearOperator:
         if isinstance(a, LinearOperator):
             return _JoinOperator(a, self)
         else:
-            return self.T @ a
+            return (self.T @ a.T).T
 
     def __mul__(self, c):
         return _ScaleOperator(c, self.shape) @ self

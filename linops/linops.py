@@ -8,6 +8,8 @@ import linops.nystrom_precondition as nystrom
 
 def operator_matrix_product(A, M):
     assert A.shape[1] == M.shape[0]
+    if A.supports_operator_matrix:
+        return A @ M
     out = torch.empty((A.shape[0], M.shape[1]))
     for i in range(M.shape[1]):
         out[:, i] = A @ M[:, i]
@@ -26,6 +28,7 @@ class LinearOperator:
     _nystrom_sketch = None
     _last_solve_of_x = None
     device = None
+    supports_operator_matrix = False
 
     def __call__(self, x):
         return self @ x
@@ -129,13 +132,15 @@ class LinearOperator:
             raise NotImplementedError()
 
 class ZeroOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, shape, adjoint=None):
         self._shape = shape
         self._adjoint = ZeroOperator((shape[1], shape[0]), self) \
                 if adjoint is None else adjoint
 
     def _matmul_impl(self, v):
-        return torch.zeros(self.shape[0], device=v.device)
+        shape = (self.shape[0], *v.shape[1:])
+        return torch.zeros(shape, device=v.device)
 
 
 class VectorJacobianOperator(LinearOperator):
@@ -153,6 +158,7 @@ class VectorJacobianOperator(LinearOperator):
         return out
 
 class IdentityOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, n):
         self._adjoint = self
         self._shape = (n, n)
@@ -164,6 +170,7 @@ class IdentityOperator(LinearOperator):
         return b
 
 class DiagonalOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, diag):
         self._adjoint = self
         self._diag = diag
@@ -171,13 +178,20 @@ class DiagonalOperator(LinearOperator):
         self._shape = (m, m)
 
     def _matmul_impl(self, v):
-        return self._diag * v
+        if len(v.shape) == 1:
+            return self._diag * v
+        else:
+            return self._diag[:, None] * v
 
     def solve_A_x_eq_b(self, b, x0=None):
-        return b / self._diag
+        if len(b.shape) == 1:
+            return b / self._diag
+        else:
+            return b / self._diag[:, None]
 
 
 class _ScaleOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
@@ -187,6 +201,7 @@ class _ScaleOperator(LinearOperator):
         return self._c * v
 
 class _ScaledownOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
@@ -196,6 +211,7 @@ class _ScaledownOperator(LinearOperator):
         return v / self._c
 
 class MatrixOperator(LinearOperator):
+    supports_operator_matrix = True
     def __init__(self, matrix, adjoint=None):
         self._matrix = matrix
         assert len(matrix.shape) == 2
@@ -241,6 +257,7 @@ class MatrixOperator(LinearOperator):
 
 class _PowOperator(LinearOperator):
     def __init__(self, linop, k:int):
+        self.supports_operator_matrix = linop.supports_operator_matrix
         self._linop = linop
         self._k = k
         assert k >= 0
@@ -252,11 +269,15 @@ class _PowOperator(LinearOperator):
         k = self._k
         while k > 0:
             v = self._linop @ v
+            k -= 1
+        return v
 
 class _BinaryOperator(LinearOperator):
     """transpose must distribute over op"""
     def __init__(self, left, right, op, adjoint=None):
         assert left.shape == right.shape
+        self.supports_operator_matrix = \
+                left.supports_operator_matrix and right.supports_operator_matrix
         self._left = left
         self._right = right
         self._op = op
@@ -272,6 +293,7 @@ class _UrnaryOperator(LinearOperator):
     """ transpose must pass through op """
     def __init__(self, linop, op, adjoint=None):
         self._linop = linop
+        self.supports_operator_matrix = linop.supports_operator_matrix
         self._op = op
         if adjoint is None:
             self._adjoint = _UrnaryOperator(self._linop.T, self._op, self)
@@ -286,6 +308,9 @@ class _JoinOperator(LinearOperator):
     def __init__(self, left, right, adjoint=None):
         self._left = left
         self._right = right
+
+        self.supports_operator_matrix = \
+                left.supports_operator_matrix and right.supports_operator_matrix
         if adjoint is None:
             self._adjoint = _JoinOperator(self._right.T, self._left.T, self)
         else:
@@ -296,6 +321,7 @@ class _JoinOperator(LinearOperator):
         return self._left @ (self._right @ y)
 
 class SelectionOperator(LinearOperator):
+    #supports_operator_matrix = True
     def __init__(self, shape, idxs):
         self._shape = shape
         self._adjoint = _AdjointSelectionOperator(idxs,
@@ -311,6 +337,7 @@ class SelectionOperator(LinearOperator):
         return b / LHS
 
 class _AdjointSelectionOperator(LinearOperator):
+    #supports_operator_matrix = True
     def __init__(self,  idxs, shape, adjoint):
         self._adjoint = adjoint
         self._idxs = idxs

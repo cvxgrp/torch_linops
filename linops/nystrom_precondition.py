@@ -45,10 +45,9 @@ def construct_approximation(
         Y_0 = lo.operator_matrix_product(A, Omega_0)
         Omega = torch.hstack([Omega, Omega_0])
         Y = torch.hstack([Y, Y_0])
-        # Check the meaning of everything on line 8 of E.2
         Y_nu = Y + nu * Omega
-        C = torch.linalg.cholesky(Omega.T @ Y_nu)
-        B = torch.linalg.solve_triangular(C, Y_nu, upper=False, left=False)
+        C = torch.linalg.cholesky(Omega.T @ Y_nu).T
+        B = torch.linalg.solve_triangular(C, Y_nu, upper=True, left=False)
         U, Sigma, _ = torch.linalg.svd(B, False)
         Lambda_hat = torch.relu(Sigma * Sigma - nu)
 

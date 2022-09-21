@@ -48,8 +48,8 @@ def construct_approximation(
         # Check the meaning of everything on line 8 of E.2
         Y_nu = Y + nu * Omega
         C = torch.linalg.cholesky(Omega.T @ Y_nu)
-        B = torch.linalg.solve_triangular(C, Y_nu, upper=False)
-        U, Sigma, _ = torch.linalg.svd(B)  # Figure out what the second argument to SVD is
+        B = torch.linalg.solve_triangular(C, Y_nu, upper=False, left=False)
+        U, Sigma, _ = torch.linalg.svd(B, False)
         Lambda_hat = torch.relu(Sigma * Sigma - nu)
 
         if break_early:
@@ -70,7 +70,7 @@ def randomized_power_err_est(A, U, Lambda_hat, q, dtype, device):
     E_hat = torch.inf
     for _ in range(q):
         v = A @ v_0 - U @ (Lambda_hat * (U.T @ v_0))
-        E_hat = v_0.T @ v
+        E_hat = (v_0 * v).sum()
         v = v / torch.linalg.norm(v)
         v_0 = v
     return E_hat

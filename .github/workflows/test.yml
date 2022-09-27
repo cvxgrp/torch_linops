@@ -23,7 +23,7 @@ jobs:
 
           - name: Run Unit Tests
             run: |
-              sudo $pythonLocation/bin/python3 -m pytest --import-mode=append test_cg.py
+              sudo $pythonLocation/bin/python3 -m pytest --import-mode=append tests/test_cg.py
 #              sudo $pythonLocation/bin/python3 -m pytest --import-mode=append tests/
 #  The commented line would run pytest on all your tests located in the test file.
 #  Remove the '#' to run it, and delete the placeholder specified test line 

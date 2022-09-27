@@ -17,14 +17,14 @@ requirements:
     - pip
     - python >=3.6
     - scipy
-    - torch
+    - pytorch
 
 
   run:
     - pip
     - python >=3.6
     - scipy
-    - torch
+    - pytorch
 
 about:
   home: https://github.com/cvxgrp/torch_linops

@@ -11,7 +11,7 @@ setup(
     description="A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    setup_requires=["setuptools>=60.0.0"],
+    setup_requires=["setuptools>=18.0"],
     install_requires=[
         "torch",
         "scipy"

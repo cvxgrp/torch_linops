@@ -1,0 +1,41 @@
+{% set name = "torch-linops" %}
+
+package:
+  name: "{{ name|lower }}"
+  version: {{ environ.get('VERSION_FROM_GIT_TAG') }}
+
+source:
+  git_url: https://github.com/cvxgrp/OSBDO
+
+build:
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . --ignore-installed -vv "
+
+requirements:
+  host:
+    - pip
+    - python >=3.6
+    - scipy
+    - pytorch
+
+
+  run:
+    - pip
+    - python >=3.6
+    - scipy
+    - pytorch
+
+about:
+  home: https://github.com/cvxgrp/torch_linops
+  license: GPLv3
+  license_family: GPL
+  license_file:
+  summary: A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors.
+  doc_url:
+  dev_url:
+
+extra:
+  recipe-maintainers:
+    - PTNobel
+    - Thistleman

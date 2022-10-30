@@ -1,4 +1,3 @@
-#!/usr/bin/python
 from setuptools import setup
 
 with open("README.md", "r") as fh:
@@ -6,9 +5,16 @@ with open("README.md", "r") as fh:
 
 setup(
     name="torch-linops",
+    version="0.0.1",
+    packages=["linops"],
+    license="GPLv3",
+    description="A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors.",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     setup_requires=["setuptools>=18.0"],
     install_requires=[
         "torch",
+        "scipy"
     ],
     url="https://github.com/cvxgrp/torch_linops",
     classifiers=[

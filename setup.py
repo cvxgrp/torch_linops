@@ -12,6 +12,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     setup_requires=["setuptools>=18.0"],
+    version='0.1.0'
     install_requires=[
         "torch",
         "scipy"

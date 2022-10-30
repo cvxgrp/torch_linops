@@ -60,6 +60,7 @@ def construct_approximation(
             l_0 = l_0 - m
             m = l_max - l_0
             break_early = True
+    #Add threshold to cut off too small values
     return _NystromApproximation(U, Lambda_hat)
 
 

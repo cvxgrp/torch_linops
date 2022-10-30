@@ -7,6 +7,7 @@ with open("README.md", "r") as fh:
 setup(
     name="torch-linops",
     setup_requires=["setuptools>=18.0"],
+    version='0.1.0'
     install_requires=[
         "torch",
     ],

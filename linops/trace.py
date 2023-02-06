@@ -12,14 +12,14 @@ Reference paper 1: https://arxiv.org/pdf/2010.09649.pdf
 Reference paper 2: https://arxiv.org/pdf/2301.07825.pdf
 """
 
-def hutchinson(A: lo.LinearOperator, m: int=1000):
+def hutchinson(A: lo.LinearOperator, m: int=400):
     k, ell = A.shape
     assert k == ell
     if k <= m:
         return exact_divergence(A)
     total = 0
     for _ in range(m):
-        z = (2 * torch.randint(2, size=k, device=A.device) - 1).float()
+        z = (2 * torch.randint(2, size=(k,), device=A.device) - 1).float()
         total = total + (z * (A @ z)).sum()
     return total / m
 
@@ -111,12 +111,12 @@ def xnystrace(A: lo.LinearOperator, m: int=60):
         return M / torch.linalg.vector_norm(M, dim=0)
 
     def diag_of_AB(A, B):
-        return torch.sum(A.T * B, dim=0)
-    Z = torch.randn(n, m)
-    Omega = math.sqrt(n) * normalize_columns(Z)
+        return torch.sum(A * B, dim=0)
+
+    Omega = math.sqrt(n) * normalize_columns(torch.randn(n, m))
     Y = A @ Omega
 
-    nu = torch.finfo(Z.dtype).eps * torch.linalg.vector_norm(Z) / math.sqrt(n)
+    nu = torch.finfo(Omega.dtype).eps * torch.linalg.vector_norm(Y) / math.sqrt(n)
     Y = Y + nu * Omega
 
     
@@ -124,7 +124,7 @@ def xnystrace(A: lo.LinearOperator, m: int=60):
     H = Omega.T @ Y
     C = torch.linalg.cholesky((H + H.T) / 2, upper=True)
 
-    B = torch.linalg.solve_triangular(C, R, upper=True)
+    B = torch.linalg.solve_triangular(C, R, upper=True, left=False) # Double check this
 
     QQ, RR = torch.linalg.qr(Omega)
     WW = QQ.T @ Omega
@@ -133,7 +133,7 @@ def xnystrace(A: lo.LinearOperator, m: int=60):
     scale = (n - m + 1) / (n - torch.linalg.vector_norm(WW, dim=0)**2 +
                            torch.abs(diag_of_AB(SS, WW) * torch.linalg.vector_norm(SS, dim=0))**2)
     W = Q.T @ Omega
-    S =  torch.linalg.solve_triangular(C.T, R, upper=False) * torch.diag(torch.linalg.inv(H))**(-0.5)
+    S =  torch.linalg.solve_triangular(C.T, B, upper=False, left=False) * torch.diag(torch.linalg.inv(H))**(-0.5) # Double check triangular solve
     dSW = diag_of_AB(S, W)
     ests = torch.linalg.norm(B, 'fro')**2 - torch.linalg.vector_norm(S, dim=0)**2 + torch.abs(dSW)**2 * scale - nu * n
     return torch.mean(ests), torch.std(ests) / math.sqrt(m)

@@ -2,12 +2,15 @@ from linops.linops import (
         operator_matrix_product,
         aslinearoperator,
         LinearOperator,
-        IdentityOperator,
-        DiagonalOperator,
         MatrixOperator,
         SelectionOperator,
-        KKTOperator,
         VectorJacobianOperator,
+)
+
+from linops.linop_impls import (
+        IdentityOperator,
+        DiagonalOperator,
+        KKTOperator,
         ZeroOperator,
 )
 from linops.blocks import (

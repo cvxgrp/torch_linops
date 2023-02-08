@@ -29,6 +29,7 @@ class LinearOperator:
     _last_solve_of_x = None
     device = None
     supports_operator_matrix = False
+    efficient_inverse = False
 
     def __call__(self, x):
         return self @ x
@@ -131,67 +132,9 @@ class LinearOperator:
         else:
             raise NotImplementedError()
 
-class ZeroOperator(LinearOperator):
-    supports_operator_matrix = True
-    def __init__(self, shape, adjoint=None):
-        self._shape = shape
-        self._adjoint = ZeroOperator((shape[1], shape[0]), self) \
-                if adjoint is None else adjoint
-
-    def _matmul_impl(self, v):
-        shape = (self.shape[0], *v.shape[1:])
-        return torch.zeros(shape, device=v.device)
-
-
-class VectorJacobianOperator(LinearOperator):
-    def __init__(self, g, x, adjoint=None):
-        self._shape = (x.shape[0], g.shape[0])
-        self._adjoint = adjoint
-        self._g = g
-        self._x = x
-
-    def _matmul_impl(self, v):
-        self._x.grad = None
-        self._g.backward(gradient=v, retain_graph=True)
-        out = self._x.grad
-        self._x.grad = None
-        return out
-
-class IdentityOperator(LinearOperator):
-    supports_operator_matrix = True
-    def __init__(self, n):
-        self._adjoint = self
-        self._shape = (n, n)
-
-    def _matmul_impl(self, v):
-        return v
-
-    def solve_A_x_eq_b(self, b, x0=None):
-        return b
-
-class DiagonalOperator(LinearOperator):
-    supports_operator_matrix = True
-    def __init__(self, diag):
-        self._adjoint = self
-        self._diag = diag
-        m, = diag.shape
-        self._shape = (m, m)
-
-    def _matmul_impl(self, v):
-        if len(v.shape) == 1:
-            return self._diag * v
-        else:
-            return self._diag[:, None] * v
-
-    def solve_A_x_eq_b(self, b, x0=None):
-        if len(b.shape) == 1:
-            return b / self._diag
-        else:
-            return b / self._diag[:, None]
-
-
 class _ScaleOperator(LinearOperator):
     supports_operator_matrix = True
+    efficient_inverse = True
     def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
@@ -200,8 +143,12 @@ class _ScaleOperator(LinearOperator):
     def _matmul_impl(self, v):
         return self._c * v
 
+    def solve_A_x_eq_b(self, b, x0=None):
+        return b / self._c
+
 class _ScaledownOperator(LinearOperator):
     supports_operator_matrix = True
+    efficient_inverse = True
     def __init__(self, c, shape):
         self._c = c
         self._adjoint = self
@@ -209,6 +156,9 @@ class _ScaledownOperator(LinearOperator):
 
     def _matmul_impl(self, v):
         return v / self._c
+
+    def solve_A_x_eq_b(self, b, x0=None):
+        return b * self._c
 
 class MatrixOperator(LinearOperator):
     supports_operator_matrix = True
@@ -264,6 +214,7 @@ class _PowOperator(LinearOperator):
         assert linop.shape[0] == linop.shape[1]
         self._adjoint = _PowOperator(self._linop.T, self._k)
         self._shape = linop.shape
+        self.efficient_inverse = linop.efficient_inverse
 
     def _matmul_impl(self, v):
         k = self._k
@@ -271,6 +222,16 @@ class _PowOperator(LinearOperator):
             v = self._linop @ v
             k -= 1
         return v
+
+    def solve_A_x_eq_b(self, b, x0=None):
+        if self.efficient_inverse:
+            k = self._k
+            while k > 0:
+                b = self._linop.solve_A_x_eq_b(b, x0)
+                k -= 1
+            return b
+        else:
+            return super().solve_A_x_eq_b(b, x0=x0)
 
 class _BinaryOperator(LinearOperator):
     """transpose must distribute over op"""
@@ -308,6 +269,8 @@ class _JoinOperator(LinearOperator):
     def __init__(self, left, right, adjoint=None):
         self._left = left
         self._right = right
+        self.efficient_inverse = \
+                left.efficient_inverse and right.efficient_inverse
 
         self.supports_operator_matrix = \
                 left.supports_operator_matrix and right.supports_operator_matrix
@@ -319,6 +282,27 @@ class _JoinOperator(LinearOperator):
 
     def _matmul_impl(self, y):
         return self._left @ (self._right @ y)
+
+    def solve_A_x_eq_b(self, b, x0=None):
+        if self.efficient_inverse:
+            y = self._left.solve_A_x_eq_b(b, self._right @ x0)
+            return self._right.solve_A_x_eq_b(y, x0)
+        else:
+            return super().solve_A_x_eq_b(b, x0=x0)
+
+class VectorJacobianOperator(LinearOperator):
+    def __init__(self, g, x, adjoint=None):
+        self._shape = (x.shape[0], g.shape[0])
+        self._adjoint = adjoint
+        self._g = g
+        self._x = x
+
+    def _matmul_impl(self, v):
+        self._x.grad = None
+        self._g.backward(gradient=v, retain_graph=True)
+        out = self._x.grad
+        self._x.grad = None
+        return out
 
 class SelectionOperator(LinearOperator):
     #supports_operator_matrix = True
@@ -348,22 +332,3 @@ class _AdjointSelectionOperator(LinearOperator):
         z[self._idxs] = y
         return z.reshape(-1)
 
-class KKTOperator(LinearOperator):
-    def __init__(self, H: LinearOperator, A: LinearOperator):
-        k, ell = H.shape
-        assert k == ell
-        m, n = A.shape
-        assert n == k
-        self._shape = (m + n, m + n)
-        self._adjoint = self
-        self._A = A
-        self._H = H
-        self._m = m
-        self._n = n
-
-    def _matmul_impl(self, y):
-        n = self._n
-        return torch.hstack([
-            self._H @ y[:n] - self._A.T @ y[n:],
-            -self._A @ y[:n]
-        ])

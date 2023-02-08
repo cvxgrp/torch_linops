@@ -61,7 +61,7 @@ def exact_divergence(A: lo.LinearOperator):
         divergence = divergence + A[i, i] @ one
     return divergence
 
-def xtrace(A, m: int=60):
+def xtrace(A, m: int=80):
     n, n1 = A.shape
     assert n == n1
     if n <= m:
@@ -100,7 +100,7 @@ def xtrace(A, m: int=60):
     return torch.mean(ests), torch.std(ests) / math.sqrt(m)
 
 
-def xnystrace(A: lo.LinearOperator, m: int=60):
+def xnystrace(A: lo.LinearOperator, m: int=80):
     """
     Entirely untested. Never run code.
     """

@@ -17,11 +17,11 @@ def hutchinson(A: lo.LinearOperator, m: int=400):
     assert k == ell
     if k <= m:
         return exact_divergence(A)
-    total = 0
-    for _ in range(m):
+    results = torch.empty(m, device=A.device)
+    for i in range(m):
         z = (2 * torch.randint(2, size=(k,), device=A.device) - 1).float()
-        total = total + (z * (A @ z)).sum()
-    return total / m
+        results[i] = (z * (A @ z)).sum()
+    return torch.mean(results), torch.std(results) / math.sqrt(m)
 
 
 
@@ -41,16 +41,17 @@ def hutchpp(A: lo.LinearOperator, m: int=102):
     BS = lo.operator_matrix_product(A, S)
     Q, _ = torch.linalg.qr(BS)
     G_prime = G - Q @ (Q.T @ G)
-    total = 0
+    exact = 0
     for i in range(Q.shape[1]):
         z = Q[:,i]
-        total = total + (z * (A @ z)).sum()
-
+        exact = exact + (z * (A @ z)).sum()
+    
+    hutchinson = torch.empty(k, device=A.device)
     for i in range(k):
         z = G_prime[:,i]
-        total = total + (z * (A @ z)).sum() / k
+        hutchinson[i] = (z * (A @ z)).sum()
 
-    return total
+    return exact + torch.mean(hutchinson), torch.std(hutchinson) / math.sqrt(m)
 
 def exact_divergence(A: lo.LinearOperator):
     m, n = A.shape
@@ -59,7 +60,7 @@ def exact_divergence(A: lo.LinearOperator):
     divergence = 0
     for i in range(m):
         divergence = divergence + A[i, i] @ one
-    return divergence
+    return divergence, 0.0
 
 def xtrace(A, m: int=80):
     n, n1 = A.shape

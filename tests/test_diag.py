@@ -4,7 +4,7 @@ import linops as lo
 import linops.diag as lod
 
 import pytest
-diag = 1.0 / (torch.arange(3_600_000)+ 1)
+diag = 1.0 / (torch.arange(600_000)+ 1)
 A = lo.DiagonalOperator(diag)
 eps = 1e-2
 

@@ -303,6 +303,7 @@ class VectorJacobianOperator(LinearOperator):
     def __init__(self, g, x, adjoint=None):
         self._shape = (x.shape[0], g.shape[0])
         self._adjoint = adjoint
+        self.device = x.device
         self._g = g
         self._x = x
 

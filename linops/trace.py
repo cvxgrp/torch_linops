@@ -75,7 +75,7 @@ def xtrace(A, m: int=80):
     def diag_of_AB(A, B):
         return torch.sum(A * B, dim=0)
 
-    Z = torch.randn(n, m)
+    Z = torch.randn(n, m, device=A.device)
     Omega = math.sqrt(n) * normalize_columns(Z)
     Y = A @ Omega
     Q, R = torch.linalg.qr(Y)
@@ -114,7 +114,7 @@ def xnystrace(A: lo.LinearOperator, m: int=80):
     def diag_of_AB(A, B):
         return torch.sum(A * B, dim=0)
 
-    Omega = math.sqrt(n) * normalize_columns(torch.randn(n, m))
+    Omega = math.sqrt(n) * normalize_columns(torch.randn(n, m, device=A.device))
     Y = A @ Omega
 
     nu = torch.finfo(Omega.dtype).eps * torch.linalg.vector_norm(Y) / math.sqrt(n)

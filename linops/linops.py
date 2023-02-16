@@ -10,7 +10,7 @@ def operator_matrix_product(A, M):
     assert A.shape[1] == M.shape[0]
     if A.supports_operator_matrix:
         return A @ M
-    out = torch.empty((A.shape[0], M.shape[1]))
+    out = torch.empty((A.shape[0], M.shape[1]), device=M.device, dtype=M.dtype)
     for i in range(M.shape[1]):
         out[:, i] = A @ M[:, i]
     return out

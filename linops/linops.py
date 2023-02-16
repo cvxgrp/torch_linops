@@ -37,8 +37,17 @@ class LinearOperator:
     def __matmul__(self, b):
         if isinstance(b, LinearOperator):
             return _JoinOperator(self, b)
-        else:
+        elif len(b.shape) == 1:
             return self._matmul_impl(b)
+        elif len(b.shape) == 2:
+            assert self.shape[1] == b.shape[0]
+            if self.supports_operator_matrix:
+                return self._matmul_impl(b)
+            else:
+                out = torch.empty((self.shape[0], b.shape[1]), device=b.device, dtype=b.dtype)
+                for i in range(b.shape[1]):
+                    out[:, i] = self._matmul_impl(b[:, i])
+                return out
 
     def __rmatmul__(self, a):
         if isinstance(a, LinearOperator):

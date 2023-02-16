@@ -1,5 +1,6 @@
 import torch
 import operator
+import linops as lo
 from linops.cg import CG
 from linops.minres import minres
 import linops.nystrom_precondition as nystrom 
@@ -131,7 +132,7 @@ class LinearOperator:
             precondition = nystrom.NystromPreconditioner(
                     self._nystrom_sketch, lambda_)
         self._last_solve_of_x = CG(
-                IdentityOperator(self.shape[1]) + lambda_ * (self.T @ self),
+                lo.IdentityOperator(self.shape[1]) + lambda_ * (self.T @ self),
                 precondition)(b)
         return self._last_solve_of_x
 

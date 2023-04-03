@@ -78,6 +78,8 @@ def xtrace(A, m: int=80, *, _gen_data_on_device=None):
     assert n == n1
     if n <= m:
         return exact_divergence(A)
+    if n <= m:
+        return exact_divergence(A)
 
     m = m // 2
     def normalize_columns(M):
@@ -115,6 +117,8 @@ def xtrace(A, m: int=80, *, _gen_data_on_device=None):
 def xnystrace(A: lo.LinearOperator, m: int=80, *, _gen_data_on_device=None):
     n, n1 = A.shape
     assert n == n1
+    if n <= m:
+        return exact_divergence(A)
     m = m // 2
     def normalize_columns(M):
         return M / torch.linalg.vector_norm(M, dim=0)

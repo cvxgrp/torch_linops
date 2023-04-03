@@ -12,31 +12,42 @@ Reference paper 1: https://arxiv.org/pdf/2010.09649.pdf
 Reference paper 2: https://arxiv.org/pdf/2301.07825.pdf
 """
 
-def hutchinson(A: lo.LinearOperator, m: int=400):
+def _sample_dist(dist, shape, _gen_data_on_device, A_dev):
+    if _gen_data_on_device is None:
+        gen_dev = A_dev
+        dest_dev = None
+    else:
+        gen_dev = _gen_data_on_device
+        dest_dev = A_dev if A_dev is not None else torch.device('cpu')
+
+    if dist == 'rademacher':
+        return 2.0 * torch.randint(2, size=shape, device=gen_dev).to(dest_dev) - 1.0
+    elif dist == 'gaussian' or dist == 'normal':
+        return torch.randn(*shape, device=gen_dev).to(dest_dev)
+
+
+def hutchinson(A: lo.LinearOperator, m: int=400, *, _gen_data_on_device=None):
     k, ell = A.shape
     assert k == ell
     if k <= m:
         return exact_divergence(A)
     results = torch.empty(m, device=A.device)
     for i in range(m):
-        z = (2 * torch.randint(2, size=(k,), device=A.device) - 1).float()
+        z = _sample_dist('rademacher', (k,), _gen_data_on_device, A.device)
         results[i] = (z * (A @ z)).sum()
     return torch.mean(results), torch.std(results) / math.sqrt(m)
 
 
 
-def hutchpp(A: lo.LinearOperator, m: int=102):
-    """
-    Algorithm taken from reference paper above on Hutch++.
-    """
+def hutchpp(A: lo.LinearOperator, m: int=102, *, _gen_data_on_device=None):
     n, ell = A.shape
     assert n == ell
     assert m % 3 == 0
     if n <= m:
         return exact_divergence(A)
     k = m // 3
-    S = 2.0 * torch.randint(0, 2, (n, k), device=A.device) - 1.0
-    G = 2.0 * torch.randint(0, 2, (n, k), device=A.device) - 1.0
+    S = _sample_dist('rademacher', (n, k), _gen_data_on_device, A.device)
+    G = _sample_dist('rademacher', (n, k), _gen_data_on_device, A.device)
 
     BS = lo.operator_matrix_product(A, S)
     Q, _ = torch.linalg.qr(BS)
@@ -62,7 +73,7 @@ def exact_divergence(A: lo.LinearOperator):
         divergence = divergence + A[i, i] @ one
     return divergence, 0.0
 
-def xtrace(A, m: int=80):
+def xtrace(A, m: int=80, *, _gen_data_on_device=None):
     n, n1 = A.shape
     assert n == n1
     if n <= m:
@@ -75,7 +86,7 @@ def xtrace(A, m: int=80):
     def diag_of_AB(A, B):
         return torch.sum(A * B, dim=0)
 
-    Z = torch.randn(n, m, device=A.device)
+    Z = _sample_dist('gaussian', (n, m), _gen_data_on_device, A.device)
     Omega = math.sqrt(n) * normalize_columns(Z)
     Y = A @ Omega
     Q, R = torch.linalg.qr(Y)
@@ -101,10 +112,7 @@ def xtrace(A, m: int=80):
     return torch.mean(ests), torch.std(ests) / math.sqrt(m)
 
 
-def xnystrace(A: lo.LinearOperator, m: int=80):
-    """
-    Entirely untested. Never run code.
-    """
+def xnystrace(A: lo.LinearOperator, m: int=80, *, _gen_data_on_device=None):
     n, n1 = A.shape
     assert n == n1
     m = m // 2
@@ -114,13 +122,14 @@ def xnystrace(A: lo.LinearOperator, m: int=80):
     def diag_of_AB(A, B):
         return torch.sum(A * B, dim=0)
 
-    Omega = math.sqrt(n) * normalize_columns(torch.randn(n, m, device=A.device))
+    Z = _sample_dist('gaussian', (n, m), _gen_data_on_device, A.device)
+    Omega = math.sqrt(n) * normalize_columns(Z)
     Y = A @ Omega
 
     nu = torch.finfo(Omega.dtype).eps * torch.linalg.vector_norm(Y) / math.sqrt(n)
     Y = Y + nu * Omega
 
-    
+
     Q, R = torch.linalg.qr(Y)
     H = Omega.T @ Y
     C = torch.linalg.cholesky((H + H.T) / 2, upper=True)

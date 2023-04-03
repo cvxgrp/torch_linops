@@ -87,16 +87,15 @@ class LinearOperator:
 
     def __pow__(self, n):
         return _PowOperator(self, n)
-    
+
     def __getitem__(self, key):
-        out = torch.empty(self.shape[0])
-        in_ = torch.empty(self.shape[1])
         if not isinstance(key, tuple):
             # Only recieved one index, so we're only applying to the output
-            shape = (out[key].shape[0], self.shape[1])
-            return SelectionOperator(shape, key) @ self
-        shape = (out[key[0]].shape[0], in_[key[1]][0])
-        return SelectionOperator(shape, key[0]) @ self @ SelectionOperator(shape, key[1]).T
+            S = _generate_selector(self.shape[0], key[0])
+            return S @ self
+        leftS = _generate_selector(self.shape[0], key[0])
+        rightS = _generate_selector(self.shape[1], key[1], flip=True)
+        return leftS @ self @ rightS.T
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -343,3 +342,13 @@ class _AdjointSelectionOperator(LinearOperator):
         z[self._idxs] = y
         return z.reshape(-1)
 
+def _generate_selector(size_of_vec, key, flip=False):
+    shape_of_output = torch.empty(size_of_vec)[key].shape
+    if len(shape_of_output) == 0:
+        shape_of_output = 1
+    else:
+        shape_of_output = shape_of_output[0]
+    return SelectionOperator(
+            (size_of_vec, shape_of_output)
+                if not flip else (shape_of_output, size_of_vec)
+            , key)

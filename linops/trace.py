@@ -30,7 +30,7 @@ def hutchinson(A: lo.LinearOperator, m: int=400, *, _gen_data_on_device=None):
     k, ell = A.shape
     assert k == ell
     if k <= m:
-        return exact_divergence(A)
+        return exact_trace(A)
     results = torch.empty(m, device=A.device)
     for i in range(m):
         z = _sample_dist('rademacher', (k,), _gen_data_on_device, A.device)
@@ -44,7 +44,7 @@ def hutchpp(A: lo.LinearOperator, m: int=102, *, _gen_data_on_device=None):
     assert n == ell
     assert m % 3 == 0
     if n <= m:
-        return exact_divergence(A)
+        return exact_trace(A)
     k = m // 3
     S = _sample_dist('rademacher', (n, k), _gen_data_on_device, A.device)
     G = _sample_dist('rademacher', (n, k), _gen_data_on_device, A.device)
@@ -64,7 +64,7 @@ def hutchpp(A: lo.LinearOperator, m: int=102, *, _gen_data_on_device=None):
 
     return exact + torch.mean(hutchinson), torch.std(hutchinson) / math.sqrt(m)
 
-def exact_divergence(A: lo.LinearOperator):
+def exact_trace(A: lo.LinearOperator):
     m, n = A.shape
     assert m == n
     one = torch.ones(1, device=A.device)
@@ -77,9 +77,7 @@ def xtrace(A, m: int=80, *, _gen_data_on_device=None):
     n, n1 = A.shape
     assert n == n1
     if n <= m:
-        return exact_divergence(A)
-    if n <= m:
-        return exact_divergence(A)
+        return exact_trace(A)
 
     m = m // 2
     def normalize_columns(M):
@@ -118,7 +116,7 @@ def xnystrace(A: lo.LinearOperator, m: int=80, *, _gen_data_on_device=None):
     n, n1 = A.shape
     assert n == n1
     if n <= m:
-        return exact_divergence(A)
+        return exact_trace(A)
     m = m // 2
     def normalize_columns(M):
         return M / torch.linalg.vector_norm(M, dim=0)

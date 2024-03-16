@@ -12,6 +12,20 @@ class ZeroOperator(LinearOperator):
         shape = (self.shape[0], *v.shape[1:])
         return torch.zeros(shape, device=v.device)
 
+class SparseOperator(LinearOperator):
+    supports_operator_matrix = True
+    def __init__(self, X, XT, adjoint=None):
+        self._shape = X.shape
+        self._X = X
+        if adjoint is None:
+            self._adjoint = SparseOperator(XT, X, self)
+        else:
+            self._adjoint = adjoint
+
+    def _matmul_impl(self, v):
+        return self._X @ v
+
+
 class IdentityOperator(LinearOperator):
     supports_operator_matrix = True
     efficient_inverse = True

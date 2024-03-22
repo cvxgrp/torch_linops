@@ -12,56 +12,62 @@ def bminres(A, B, M=None, X0=None, tol=1e-5, maxiters=None, verbose=True):
     #if M is None:
     #    M = lo.IdentityOperator(m)
     if maxiters is None:
-        maxiters = 5 * n
+        maxiters = n
     if X0 is None:
         X0 = torch.zeros_like(B)
-    else:
-        X = X0
 
     k = 1
 
-    R_hat_km1 = B - A @ X0
+    R_hat_0 = B - A @ X0
 
     X_hat = X0
     Z_km1 = torch.zeros_like(X0)
-    Z_k, nu_k_inv = torch.qr(R_hat_km1)
-    RHS_phi = nu_k_inv
-    phi_k = torch.zeros(s)
+    Z_k, nu_k_inv = torch.linalg.qr(R_hat_0)
+    RHS_psi = nu_k_inv
+    psi_km1 = torch.zeros(s, s)
     W_bar_k = Z_k
-    rho_km1 = 0
+    #rho_km1 = 0
     AZ_k = A @ Z_k
     rho_k = Z_k.T @ AZ_k
     L_bar_k_k = rho_k
-    V_kp1 = torch.eye(2 * s)
+    V_k_T = torch.eye(2 * s)
 
     for k in range(1, maxiters):
-        Z_k, nu_k_inv, Z_km1 = torch.qr(AZ_k - Z_k @ rho_k - Z_km1 @ nu_k_inv.T), Z_k
+        Z_k, nu_k_inv, Z_km1 = *torch.linalg.qr(AZ_k - Z_k @ rho_k - Z_km1 @ nu_k_inv.T), Z_k
+        print(torch.linalg.norm(torch.eye(s) - Z_k.T @ Z_k))
         AZ_k = A @ Z_k
-        rho_k = Z_k @ AZ_k
-        temp = nu_k_inv @ V_k.T[s:, :]
-        L_k_km2, L_bar_kp1_k = temp[:s, :], temp[s:, :]
+        rho_k = Z_k.T @ AZ_k
+        temp = nu_k_inv @ V_k_T[s:, :] # Double check this step
+        L_k_km2, L_bar_kp1_k = temp[:, :s], temp[:, s:]
 
         temp = torch.vstack([L_bar_k_k.T, nu_k_inv])
-        V_kp1_T, L_k_k_T_aug = torch.qr(temp, mode='complete')
+        V_k_T, L_k_k_T_aug = torch.linalg.qr(temp, 'complete') # V_k_T should not be orthogonal. V_k should be.
         L_k_k = L_k_k_T_aug[:s, :].T
+        print(torch.linalg.norm(torch.eye(2 * s) - V_k_T @ V_k_T.T))
+        print(torch.linalg.norm(torch.eye(2 * s) - V_k_T.T @ V_k_T))
 
-        temp = torch.hstack([L_bar_kp1_k, rho_k]) @ V_kp1_T
-        L_kp1_k, L_bar_k_k = temp[s:, :], temp[:s, :]
+        temp = torch.hstack([L_bar_kp1_k, rho_k]) @ V_k_T
+        L_kp1_k, L_bar_k_k = temp[:, s:], temp[:, :s]
 
 
-        temp = torch.hstack([W_bar_k, Z_k]) @ V_kp1_T
-        W_k, W_bar_k = temp[s:, :], temp[:s, :]
+        temp = torch.hstack([W_bar_k, Z_k]) @ V_k_T
+        W_k, W_bar_k = temp[:, s:], temp[:, :s]
 
         # TODO: Check if better solve; should be triangular
-        phi_km1 = phi_k
-        phi_k = torch.linalg.solve(L_k_k, RHS_phi)
-        RHS_phi = -(L_kp1_k @ phi_k + L_k_km2 @ phi_km1)
+        psi_k = torch.linalg.solve(L_k_k, RHS_psi)
+        RHS_psi = -(L_kp1_k @ psi_k + L_k_km2 @ psi_km1)
 
-        X_hat += W_k @ phi_k
+        X_hat += W_k @ psi_k
+        psi_km1 = psi_k
+        del psi_k
+
+        psi_bar_kp1 = torch.linalg.solve(L_bar_k_k, RHS_psi)
+        X = X_hat + W_bar_k  @ psi_bar_kp1
+        print(k, torch.linalg.norm(B - A @ X) / torch.linalg.norm(B))
 
     # TODO: Check if better solve; should be triangular
-    phi_bar_kp1 = torch.linalg.solve(L_bar_k_k, RHS_phi)
-    return X_hat + W_bar_k  @ phi_bar_kp1, k + 1
+    psi_bar_kp1 = torch.linalg.solve(L_bar_k_k, RHS_psi)
+    return X_hat + W_bar_k  @ psi_bar_kp1, k + 1
 
 
 

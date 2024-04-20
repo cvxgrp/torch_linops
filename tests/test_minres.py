@@ -12,11 +12,13 @@ def to_implement_test():
     A = lo.MatrixOperator(
             A_tensor
     )
-    b = torch.Tensor([5., 7.])
+    b = torch.Tensor([[5., 7.], [3., 6]])
     y_lo = lo.minres.minres(A, b)
     
-    A = A_tensor.numpy()
-    b = b.numpy()
-    y_sp = sp.linalg.minres(A, b)
+    #A = A_tensor.numpy()
+    #b = b.numpy()
+    #y_sp = sp.linalg.minres(A, b)
     print(y_lo)
-    print(y_sp)
+    print(torch.linalg.vector_norm(A @ y_lo - b))
+
+to_implement_test()

@@ -49,59 +49,68 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
     else:
         x = x0
     iters = 0
-    Anorm = 0
-    Acond = 0
-    eps = torch.tensor(torch.finfo(b.dtype).eps, device=x.device)
+    # Stopping criterion only
+    Anorm = 0 # scalar
 
-    r1 = b - A @ x
-    y = M @ r1
+    # Stopping criterion only
+    Acond = 0 # scalar
+    eps = torch.tensor(torch.finfo(b.dtype).eps, device=x.device) # scalar
 
-    beta1 = r1 @ y
-    assert beta1 >= 0
-    if beta1 == 0:
+    r1 = b - A @ x # Supports block
+    y = M @ r1 # Supports block
+
+    #beta1 = r1 @ y # Needs modification
+    beta1 = inner(r1, y)
+    assert beta1.min() >= 0, "M must be PD"
+    if (beta1 == 0).all():
         return x
     bnorm = torch.linalg.vector_norm(b)
     if bnorm == 0:
         return b
 
-    beta1 = torch.sqrt(beta1)
+    beta1 = torch.sqrt(beta1) # Supports block
 
-    oldb = 0
-    beta = beta1
-    dbar = 0
-    epsilon = 0
-    phibar = beta1
-    rhs1 = beta1
-    rhs2 = 0
-    tnorm2 = torch.tensor(0.0, device=x.device)
+    oldb = torch.zeros_like(beta1) # Supports block
+    beta = beta1 # Supports block
+    dbar = torch.zeros_like(beta1) # Supports block
+    epsilon = torch.zeros_like(beta1) # Supports block
+    phibar = beta1 # Supports block
+    rhs1 = beta1 # Supports block
+    rhs2 = torch.zeros_like(beta1) # Supports block
+
+    # Stopping criterion only
+    tnorm2 = torch.zeros_like(beta1)
+    # Only for illconditioning detection
     gmax = torch.tensor(0.0, device=x.device)
+    # Only for illconditioning detection
     gmin = torch.tensor(torch.finfo(x.dtype).max, device=x.device)
-    cs = -1
-    sn = 0
-    w = torch.zeros_like(b)
-    w2 = torch.zeros_like(b)
-    r2 = r1
+
+    cs = -torch.ones_like(beta1)
+    sn = torch.zeros_like(beta1) # Supports block
+    w = torch.zeros_like(b) # Supports block
+    w2 = torch.zeros_like(b) # Supports block
+    r2 = r1 # Supports block
     
     while iters < maxiters:
         iters += 1
-        s = 1.0 / beta
-        v = s * y
-        y = A @ v
+        s = 1.0 / beta # Supports block
+        v = s * y # Supports block
+        y = A @ v # Supports block
         if iters >= 2:
             y = y - (beta / oldb) * r1
 
-        alpha = v @ y
+        alpha = inner(v, y)
         y = y - (alpha / beta) * r2
         r1 = r2
         r2 = y
         y = M @ r2
         oldb = beta
-        beta = r2 @ y
-        assert beta >= 0
+        beta = inner(r2, y)
+        assert (beta >= 0).all()
         beta = torch.sqrt(beta)
         tnorm2 += alpha**2 + oldb**2 + beta**2
         if iters == 1:
-            if beta / beta1 <= 10 * eps:
+            if (beta / beta1).min() <= 10 * eps:
                 #assert False, "I think this occurs when A = c * I"
                 pass
 
@@ -127,19 +136,19 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         w = (v - oldeps * w1 - delta * w2) * denom
         x = x + phi * w
 
-        gmax = torch.max(gmax, gamma)
-        gmin = torch.min(gmin, gamma)
+        gmax = torch.max(gmax, gamma).max()
+        gmin = torch.min(gmin, gamma).min()
         z = rhs1 / gamma
         rhs1 = rhs2 - delta * z
         rhs2 = - epsilon * z
 
-        Anorm = torch.sqrt(tnorm2)
+        Anorm = torch.sqrt(tnorm2.max())
         ynorm = torch.linalg.norm(x)
         epsa = Anorm * eps
         epsx = Anorm * ynorm * eps
         #epsr = Anorm * ynorm * tol
         diag = gbar
-        if diag == 0:
+        if (diag == 0).any():
             diag = epsa
         qrnorm = phibar
         rnorm = qrnorm
@@ -153,8 +162,8 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         else:
             test2 = root / Anorm
         Acond = gmax / gmin
-        t1 = 1 + test1
-        t2 = 1 + test2
+        t1 = 1 + test1.max()
+        t2 = 1 + test2.max()
         if t2 <= 1:
             break
         if t1 <= 1:
@@ -162,13 +171,16 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
 
         if Acond >= 0.1 / eps:
             assert False, "System is ill-conditioned."
-        if epsx >= beta1:
+        if (epsx >= beta1).any():
             assert False
-        if test2 <= tol:
+        if test2.max() <= tol:
             break
-        if test1 <= tol:
+        if test1.max() <= tol:
             break
     return x
 
 def L2norm2entry(x, y):
     return torch.sqrt(x**2 + y**2)
+
+def inner(x, y):
+    return (x * y).sum(axis=0) # Supports block

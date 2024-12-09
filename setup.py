@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="torch-linops",
-    version="0.1.5",
+    version="0.1.6",
     packages=["linops"],
     license="Apache",
     description="A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors.",

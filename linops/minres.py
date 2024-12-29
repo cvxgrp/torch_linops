@@ -64,8 +64,8 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
     assert beta1.min() >= 0, "M must be PD"
     if (beta1 == 0).all():
         return x
-    bnorm = torch.linalg.vector_norm(b)
-    if bnorm == 0:
+    bnorm = torch.linalg.vector_norm(b, dim=0)
+    if bnorm.max() == 0:
         return b
 
     beta1 = torch.sqrt(beta1) # Supports block
@@ -143,7 +143,7 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
         rhs2 = - epsilon * z
 
         Anorm = torch.sqrt(tnorm2.max())
-        ynorm = torch.linalg.norm(x)
+        ynorm = torch.linalg.norm(x, dim=0)
         epsa = Anorm * eps
         epsx = Anorm * ynorm * eps
         #epsr = Anorm * ynorm * tol
@@ -152,7 +152,7 @@ def minres(A, b, M=None, x0=None, tol=1e-5, maxiters=None, verbose=True):
             diag = epsa
         qrnorm = phibar
         rnorm = qrnorm
-        if ynorm == 0 or Anorm == 0:
+        if ynorm.max() == 0 or Anorm == 0:
             test1 = torch.inf
         else:
             test1 = rnorm / (Anorm * ynorm)

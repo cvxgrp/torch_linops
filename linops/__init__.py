@@ -10,10 +10,10 @@ from linops.linops import (
 from linops.linop_impls import (
         IdentityOperator,
         DiagonalOperator,
-        KKTOperator,
-        ZeroOperator,
+        KKTOperator
 )
 from linops.blocks import (
+    ZeroOperator,
     vstack,
     hstack
 )

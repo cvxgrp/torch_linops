@@ -192,7 +192,7 @@ def lsqr(A, b, damp=0.0, atol=1e-6, btol=1e-6, conlim=1e8,
             test2 = arnorm / (anorm * rnorm + eps)
             test3 = 1 / (acond + eps)
             t1 = test1 / (1 + anorm * xnorm/bnorm)
-            rtol = btol + atol * anorm / bnorm
+            rtol = btol + atol * anorm * xnorm / bnorm
 
             if itn >= iter_lim:
                 istop = 7

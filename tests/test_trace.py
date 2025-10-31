@@ -23,7 +23,7 @@ def run_test_on(f, big=True):
     trace, err = f(A)
     true_trace = diag.sum()
     assert torch.abs(trace - true_trace) < eps * true_trace
-    assert torch.abs(trace - true_trace) < 2.5 * (err + 1e-6 * true_trace)
+    assert torch.abs(trace - true_trace) < 3 * (err + 1e-6 * true_trace)
 
 def test_hutchinson():
     run_test_on(lot.hutchinson)

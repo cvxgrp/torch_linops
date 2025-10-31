@@ -1,3 +1,23 @@
 [build-system]
 requires = ["setuptools >= 18.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include=["linops"]
+
+[project]
+name="torch-linops"
+version="0.1.6"
+license="Apache-2.0"
+description="A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors."
+dependencies = [ 'torch >= 2.0.0' ]
+#urls=[{"https://github.com/cvxgrp/torch_linops"}]
+classifiers=[
+   "Programming Language :: Python :: 3"
+]
+authors = [{name = "Parth Nobel", email = "ptnobel@stanford.edu"}]
+
+[project.readme]
+file = "README.md"
+content-type = "text/markdown"
+

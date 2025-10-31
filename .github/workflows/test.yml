@@ -43,7 +43,7 @@ jobs:
           - name: Create the distribution
             run: |
               git fetch --prune --unshallow --tags
-              sudo python setup.py sdist bdist_wheel
+              sudo python -m build
     test-build-conda:
         needs: run-tests
         runs-on: ubuntu-latest

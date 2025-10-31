@@ -21,7 +21,7 @@ jobs:
           - name: Create the distribution
             run: |
               git fetch -f --prune --unshallow --tags
-              sudo python setup.py sdist bdist_wheel
+              sudo python -m build
           - name: Push to PyPI
             run: sudo twine upload -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }} dist/*
 

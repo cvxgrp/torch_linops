@@ -215,13 +215,13 @@ class MatrixOperator(LinearOperator):
         return self._last_solve_of_x
 
 class _PowOperator(LinearOperator):
-    def __init__(self, linop, k:int):
+    def __init__(self, linop, k:int, adjoint=None):
         self.supports_operator_matrix = linop.supports_operator_matrix
         self._linop = linop
         self._k = k
         assert k >= 0
         assert linop.shape[0] == linop.shape[1]
-        self._adjoint = _PowOperator(self._linop.T, self._k)
+        self._adjoint = _PowOperator(self._linop.T, self._k, self) if adjoint is None else adjoint
         self._shape = linop.shape
         self.efficient_inverse = linop.efficient_inverse
 

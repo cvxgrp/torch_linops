@@ -91,7 +91,7 @@ class LinearOperator:
     def __getitem__(self, key):
         if not isinstance(key, tuple):
             # Only recieved one index, so we're only applying to the output
-            S = _generate_selector(self.shape[0], key[0])
+            S = _generate_selector(self.shape[0], key)
             return S @ self
         leftS = _generate_selector(self.shape[0], key[0])
         rightS = _generate_selector(self.shape[1], key[1], flip=True)

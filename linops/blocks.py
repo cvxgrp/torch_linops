@@ -8,6 +8,7 @@ class FusedOperator(LinearOperator):
                        out_slices: list[slice],
                        ops: list[LinearOperator],
                        adjoint=None):
+        super().__init__()
         self._shape = shape
         self._in_slices = in_slices
         self._out_slices = out_slices
@@ -28,6 +29,7 @@ class FusedOperator(LinearOperator):
 
 class ZeroOperator(LinearOperator):
     def __init__(self, shape: tuple[int, int], adjoint=None):
+        super().__init__()
         self._shape = shape
         if adjoint is None:
             self._adjoint = ZeroOperator((shape[1], shape[0]), self)

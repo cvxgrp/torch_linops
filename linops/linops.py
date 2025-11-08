@@ -5,6 +5,11 @@ from linops.cg import CG
 from linops.minres import minres
 import linops.nystrom_precondition as nystrom 
 
+Symmetric = object()
+
+class AdjointShield:
+    def __init__(self, op):
+        self.op = op
 
 
 def operator_matrix_product(A, M):
@@ -23,7 +28,7 @@ def aslinearoperator(A):
     else:
         return MatrixOperator(A)
 
-class LinearOperator:
+class LinearOperator(torch.nn.Module):
     _adjoint = None
     _shape: tuple[int, int] = None
     _nystrom_sketch = None
@@ -31,6 +36,9 @@ class LinearOperator:
     device = None
     supports_operator_matrix = False
     efficient_inverse = False
+
+    def __init__(self):
+        super().__init__()
 
     def __call__(self, x):
         return self @ x
@@ -110,7 +118,11 @@ class LinearOperator:
         if self._adjoint is None:
             x = torch.ones(self.shape[1], device=self.device, requires_grad=True)
             g = self @ x
-            self._adjoint = VectorJacobianOperator(g, x, self)
+            self._adjoint = VectorJacobianOperator(g, x, AdjointShield(self))
+        if self._adjoint is Symmetric:
+            return self
+        if isinstance(self._adjoint, AdjointShield):
+            return self._adjoint.op
         return self._adjoint
 
     def _matmul_impl(self, v):
@@ -136,17 +148,21 @@ class LinearOperator:
         return self._last_solve_of_x
 
     def solve_A_x_eq_b(self, b, x0=None):
-        if self is self._adjoint:
+        if self._adjoint is Symmetric:
             return minres(self, b, x0=x0)
         else:
             raise NotImplementedError()
+
+    def forward(self, x):
+        return self @ x
 
 class _ScaleOperator(LinearOperator):
     supports_operator_matrix = True
     efficient_inverse = True
     def __init__(self, c, shape):
+        super().__init__()
         self._c = c
-        self._adjoint = self
+        self._adjoint = Symmetric
         self._shape = shape
 
     def _matmul_impl(self, v):
@@ -159,8 +175,9 @@ class _ScaledownOperator(LinearOperator):
     supports_operator_matrix = True
     efficient_inverse = True
     def __init__(self, c, shape):
+        super().__init__()
         self._c = c
-        self._adjoint = self
+        self._adjoint = Symmetric
         self._shape = shape
 
     def _matmul_impl(self, v):
@@ -172,11 +189,12 @@ class _ScaledownOperator(LinearOperator):
 class MatrixOperator(LinearOperator):
     supports_operator_matrix = True
     def __init__(self, matrix, adjoint=None):
+        super().__init__()
         self._matrix = matrix
         assert len(matrix.shape) == 2
         self._shape = matrix.shape
         if adjoint is None:
-            self._adjoint = MatrixOperator(self._matrix.T, self)
+            self._adjoint = MatrixOperator(self._matrix.T, AdjointShield(self))
         else:
             self._adjoint = adjoint
         self.__ATA_matrix = None
@@ -216,12 +234,13 @@ class MatrixOperator(LinearOperator):
 
 class _PowOperator(LinearOperator):
     def __init__(self, linop, k:int, adjoint=None):
+        super().__init__()
         self.supports_operator_matrix = linop.supports_operator_matrix
         self._linop = linop
         self._k = k
         assert k >= 0
         assert linop.shape[0] == linop.shape[1]
-        self._adjoint = _PowOperator(self._linop.T, self._k, self) if adjoint is None else adjoint
+        self._adjoint = _PowOperator(self._linop.T, self._k, AdjointShield(self)) if adjoint is None else adjoint
         self._shape = linop.shape
         self.efficient_inverse = linop.efficient_inverse
 
@@ -245,6 +264,7 @@ class _PowOperator(LinearOperator):
 class _BinaryOperator(LinearOperator):
     """transpose must distribute over op"""
     def __init__(self, left, right, op, adjoint=None):
+        super().__init__()
         assert left.shape == right.shape
         self.supports_operator_matrix = \
                 left.supports_operator_matrix and right.supports_operator_matrix
@@ -253,7 +273,7 @@ class _BinaryOperator(LinearOperator):
         self._op = op
         if adjoint is None:
             self._adjoint = _BinaryOperator(
-                    self._left.T, self._right.T, self._op, self)
+                    self._left.T, self._right.T, self._op, AdjointShield(self))
         self._shape = left.shape
 
     def _matmul_impl(self, y):
@@ -262,11 +282,12 @@ class _BinaryOperator(LinearOperator):
 class _UrnaryOperator(LinearOperator):
     """ transpose must pass through op """
     def __init__(self, linop, op, adjoint=None):
+        super().__init__()
         self._linop = linop
         self.supports_operator_matrix = linop.supports_operator_matrix
         self._op = op
         if adjoint is None:
-            self._adjoint = _UrnaryOperator(self._linop.T, self._op, self)
+            self._adjoint = _UrnaryOperator(self._linop.T, self._op, AdjointShield(self))
         else:
             self._adjoint = adjoint
         self._shape = linop.shape
@@ -276,6 +297,7 @@ class _UrnaryOperator(LinearOperator):
     
 class _JoinOperator(LinearOperator):
     def __init__(self, left, right, adjoint=None):
+        super().__init__()
         self._left = left
         self._right = right
         self.efficient_inverse = \
@@ -284,7 +306,7 @@ class _JoinOperator(LinearOperator):
         self.supports_operator_matrix = \
                 left.supports_operator_matrix and right.supports_operator_matrix
         if adjoint is None:
-            self._adjoint = _JoinOperator(self._right.T, self._left.T, self)
+            self._adjoint = _JoinOperator(self._right.T, self._left.T, AdjointShield(self))
         else:
             self._adjoint = adjoint
         self._shape = (left.shape[0], right.shape[1])
@@ -301,6 +323,7 @@ class _JoinOperator(LinearOperator):
 
 class VectorJacobianOperator(LinearOperator):
     def __init__(self, g, x, adjoint=None):
+        super().__init__()
         self._shape = (x.shape[0], g.shape[0])
         self._adjoint = adjoint
         self.device = x.device
@@ -317,6 +340,7 @@ class VectorJacobianOperator(LinearOperator):
 class SelectionOperator(LinearOperator):
     #supports_operator_matrix = True
     def __init__(self, shape, idxs):
+        super().__init__()
         self._shape = shape
         self._adjoint = _AdjointSelectionOperator(idxs,
                 (self._shape[1], self._shape[0]), self)
@@ -333,6 +357,7 @@ class SelectionOperator(LinearOperator):
 class _AdjointSelectionOperator(LinearOperator):
     #supports_operator_matrix = True
     def __init__(self,  idxs, shape, adjoint):
+        super().__init__()
         self._adjoint = adjoint
         self._idxs = idxs
         self._shape = shape

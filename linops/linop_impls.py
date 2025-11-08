@@ -1,11 +1,12 @@
 import torch
-from linops import LinearOperator
+from linops.linops import LinearOperator, Symmetric, AdjointShield
 
 class ZeroOperator(LinearOperator):
     supports_operator_matrix = True
     def __init__(self, shape, adjoint=None):
+        super().__init__()
         self._shape = shape
-        self._adjoint = ZeroOperator((shape[1], shape[0]), self) \
+        self._adjoint = ZeroOperator((shape[1], shape[0]), AdjointShield(self)) \
                 if adjoint is None else adjoint
 
     def _matmul_impl(self, v):
@@ -15,10 +16,11 @@ class ZeroOperator(LinearOperator):
 class SparseOperator(LinearOperator):
     supports_operator_matrix = True
     def __init__(self, X, XT, adjoint=None):
+        super().__init__()
         self._shape = X.shape
         self._X = X
         if adjoint is None:
-            self._adjoint = SparseOperator(XT, X, self)
+            self._adjoint = SparseOperator(XT, X, AdjointShield(self))
         else:
             self._adjoint = adjoint
 
@@ -30,7 +32,8 @@ class IdentityOperator(LinearOperator):
     supports_operator_matrix = True
     efficient_inverse = True
     def __init__(self, n):
-        self._adjoint = self
+        super().__init__()
+        self._adjoint = Symmetric
         self._shape = (n, n)
 
     def _matmul_impl(self, v):
@@ -44,7 +47,8 @@ class DiagonalOperator(LinearOperator):
     supports_operator_matrix = True
     efficient_inverse = True
     def __init__(self, diag):
-        self._adjoint = self
+        super().__init__()
+        self._adjoint = Symmetric
         self._diag = diag
         m, = diag.shape
         self._shape = (m, m)
@@ -63,12 +67,13 @@ class DiagonalOperator(LinearOperator):
 
 class KKTOperator(LinearOperator):
     def __init__(self, H: LinearOperator, A: LinearOperator):
+        super().__init__()
         k, ell = H.shape
         assert k == ell
         m, n = A.shape
         assert n == k
         self._shape = (m + n, m + n)
-        self._adjoint = self
+        self._adjoint = Symmetric
         self._A = A
         self._H = H
         self._m = m

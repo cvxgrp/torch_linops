@@ -29,7 +29,7 @@ def aslinearoperator(A):
         return MatrixOperator(A)
 
 class LinearOperator(torch.nn.Module):
-    _adjoint = None
+    _adjoint: "LinearOperator"
     _shape: tuple[int, int] = None
     _nystrom_sketch = None
     _last_solve_of_x = None
@@ -115,7 +115,7 @@ class LinearOperator(torch.nn.Module):
         Can probably be auto-generated with
             D_x(v @ A @ x) = A^T v
         """
-        if self._adjoint is None:
+        if getattr(self, '_adjoint', None) is None:
             x = torch.ones(self.shape[1], device=self.device, requires_grad=True)
             g = self @ x
             self._adjoint = VectorJacobianOperator(g, x, AdjointShield(self))
@@ -343,11 +343,11 @@ class SelectionOperator(LinearOperator):
         super().__init__()
         self._shape = shape
         self._adjoint = _AdjointSelectionOperator(idxs,
-                (self._shape[1], self._shape[0]), self)
+                (self._shape[1], self._shape[0]), AdjointShield(self))
         self._idxs = idxs
 
     def _matmul_impl(self, X):
-        return X[self._idxs]
+        return torch.atleast_1d(X[self._idxs])
 
     def solve_I_p_lambda_AT_A_x_eq_b(self, lambda_, b):
         LHS = torch.ones_like(b)

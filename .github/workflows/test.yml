@@ -35,7 +35,7 @@ jobs:
           - name: Install Python
             uses: actions/setup-python@v3
             with:
-              python-version: "3.8"
+              python-version: "3.13"
 
           - name: Install Twine
             run: sudo pip install twine
@@ -59,7 +59,7 @@ jobs:
           - name: Install Python
             uses: actions/setup-python@v3
             with:
-              python-version: "3.8"
+              python-version: "3.13"
 
           - name: Install Miniconda
             uses: conda-incubator/setup-miniconda@v2

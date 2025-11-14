@@ -16,7 +16,9 @@ jobs:
               python-version: "3.12"
 
           - name: Install Twine
-            run: sudo pip install twine
+            run: |
+              sudo pip install twine
+              sudo pip install -U packaging
 
           - name: Create the distribution
             run: |

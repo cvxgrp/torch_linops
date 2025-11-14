@@ -23,4 +23,3 @@ content-type = "text/markdown"
 
 [tool.setuptools]
 license-files = []
-license-expression = []

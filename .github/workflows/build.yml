@@ -17,6 +17,8 @@ jobs:
 
           - name: Install Twine
             run: |
+              sudo apt update
+              sudo apt upgrade
               sudo pip install twine
 
           - name: Create the distribution

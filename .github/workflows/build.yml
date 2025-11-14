@@ -18,7 +18,6 @@ jobs:
           - name: Install Twine
             run: |
               sudo pip install twine
-              sudo pip install -U packaging
 
           - name: Create the distribution
             run: |

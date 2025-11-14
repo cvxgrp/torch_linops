@@ -21,3 +21,5 @@ authors = [{name = "Parth Nobel", email = "ptnobel@stanford.edu"}]
 file = "README.md"
 content-type = "text/markdown"
 
+[tool.setuptools]
+license-files = []

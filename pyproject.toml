@@ -7,7 +7,7 @@ include=["linops"]
 
 [project]
 name="torch-linops"
-version="0.1.7"
+version="0.2.0"
 license="Apache-2.0"
 description="A library to define abstract linear operators, and associated algebra and matrix-free algorithms, that works with pyTorch Tensors."
 dependencies = [ 'torch >= 2.0.0' ]

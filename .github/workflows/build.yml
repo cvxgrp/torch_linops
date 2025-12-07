@@ -1,76 +1,50 @@
-name: Deploy Main
-on:
-  release:
-    types: [published]
+name: Publish Python 🐍 distribution 📦 to PyPI
+
+on: push
+
 jobs:
-    deploy-pypi:
-        runs-on: ubuntu-latest
-        environment: deployment
-        steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v3
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
 
-          - name: Install Python
-            uses: actions/setup-python@v3
-            with:
-              python-version: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
 
-          - name: Install Twine
-            run: |
-              sudo apt update
-              sudo apt upgrade
-              sudo pip install twine
+      - name: Install pypa/build
+        run: >-
+          python3 -m
+          pip install
+          build
+          --user
+      - name: Build a binary wheel and a source tarball
+        run: python3 -m build
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
 
-          - name: Create the distribution
-            run: |
-              git fetch -f --prune --unshallow --tags
-              sudo pip install build
-              sudo python -m build
-          - name: Push to PyPI
-            run: sudo twine upload -u ${{ secrets.PYPI_USERNAME }} -p ${{ secrets.PYPI_PASSWORD }} dist/*
-
-    deploy-conda:
-        runs-on: ubuntu-latest
-        environment: deployment
-# sets default shell to remove need for source to run the conda shell
-        defaults:
-          run:
-            shell: bash -l {0}
-        steps:
-          - name: Checkout Repository
-            uses: actions/checkout@v3
-
-          - name: Install Python
-            uses: actions/setup-python@v3
-            with:
-              python-version: "3.12"
-
-          - name: Install Miniconda
-            uses: conda-incubator/setup-miniconda@v2
-            with:
-              auto-activate-base: true
-              activate-environment: ""
-              miniconda-version: "latest"
-
-          - name: Install the Conda Dependencies
-            run: |
-              conda config --set always_yes yes --set auto_update_conda false
-              conda update conda
-              conda install conda-build
-
-# echo yes before login to prevent anaconda bug breaking automation
-# git tags MUST be fetched otherwise output will be blank
-# bash variables cannot be used in github actions, must use actions specific syntax and methods
-          - name: Build the Anaconda Package
-            id: condabuild
-            run: |
-              conda install anaconda-client
-              conda config --set anaconda_upload no
-              echo yes | anaconda login --username ${{ secrets.ANACONDA_CLOUD_USERNAME }} --password ${{ secrets.ANACONDA_CLOUD_PASSWORD }}
-              git fetch -f --prune --unshallow --tags
-              VERSION_FROM_GIT_TAG=$(git tag --list "v*[0-9]" --sort=version:refname | tail -1 | cut -c 2-) conda build . -c pytorch -c stanfordcvxgrp -c conda-forge --numpy 1.22.2
-              echo '::set-output name=gitversion::$(git tag --list "v*[0-9]" --sort=version:refname | tail -1 | cut -c 2-)'
-          - name: Upload the Anaconda Package
-            id: condaload
-            run: |
-              anaconda upload -u stanfordcvxgrp  /usr/share/miniconda3/conda-bld/noarch/torch-linops-${{ steps.condabuild.outputs.gitversion }}-*.tar.bz2
+  publish-to-pypi:
+    name: >-
+      Publish Python 🐍 distribution 📦 to PyPI
+    if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/randalo
+    permissions:
+      id-token: write  # IMPORTANT: mandatory for trusted publishing
+    steps:
+    - name: Download all the dists
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish distribution 📦 to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
